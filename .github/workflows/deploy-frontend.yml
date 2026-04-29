@@ -29,6 +29,34 @@ jobs:
           REACT_APP_API_URL: https://event-backend-iba-fzbkbpdqb6f9f2am.uaenorth-01.azurewebsites.net
           CI: false
 
+      - name: Add server files to build
+        run: |
+          cat > ./event-frontend/build/server.js << 'EOF'
+          const express = require('express');
+          const path = require('path');
+          const app = express();
+          const PORT = process.env.PORT || 3000;
+          app.use(express.static(path.join(__dirname)));
+          app.get('*', (req, res) => {
+            res.sendFile(path.join(__dirname, 'index.html'));
+          });
+          app.listen(PORT, () => console.log(`Frontend running on port ${PORT}`));
+          EOF
+
+          cat > ./event-frontend/build/package.json << 'EOF'
+          {
+            "name": "event-frontend-server",
+            "version": "1.0.0",
+            "main": "server.js",
+            "scripts": {
+              "start": "node server.js"
+            },
+            "dependencies": {
+              "express": "^4.18.2"
+            }
+          }
+          EOF
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
