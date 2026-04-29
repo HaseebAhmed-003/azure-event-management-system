@@ -26,7 +26,7 @@ jobs:
         working-directory: ./event-frontend
         run: npm run build
         env:
-          REACT_APP_API_URL: https://event-backend-iba.azurewebsites.net
+          REACT_APP_API_URL: https://event-backend-iba-fzbkbpdqb6f9f2am.uaenorth-01.azurewebsites.net
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
