@@ -12,6 +12,17 @@
  *   /api/tickets     → QR tickets
  *   /api/attendance  → QR scanning
  */
+const appInsights = require('applicationinsights');
+if (process.env.APPINSIGHTS_CONNECTION_STRING) {
+  appInsights.setup(process.env.APPINSIGHTS_CONNECTION_STRING)
+    .setAutoDependencyCorrelation(true)
+    .setAutoCollectRequests(true)
+    .setAutoCollectPerformance(true)
+    .setAutoCollectExceptions(true)
+    .setAutoCollectDependencies(true)
+    .start();
+  console.log('[AppInsights] Application Insights initialized');
+}
 
 require("dotenv").config();
 const express = require("express");
@@ -24,13 +35,17 @@ const bookingRoutes    = require("./routes/booking.routes");
 const paymentRoutes    = require("./routes/payment.routes");
 const ticketRoutes     = require("./routes/ticket.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
+const reviewRoutes = require("./routes/review.routes");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -43,6 +58,7 @@ app.use("/api/bookings",   bookingRoutes);
 app.use("/api/payments",   paymentRoutes);
 app.use("/api/tickets",    ticketRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 app.get("/", (req, res) => {
   res.json({

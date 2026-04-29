@@ -1,88 +1,101 @@
 /**
- * Email Service — sends booking confirmation with QR code image attached.
- * Called automatically after a successful payment.
- * Uses Nodemailer. Configure SMTP settings in .env
+ * Email Service — Azure Logic Apps Integration
+ * 
+ * Instead of sending emails directly via SMTP (nodemailer),
+ * we call an Azure Logic Apps HTTP trigger which handles the email.
+ * 
+ * This is the cloud automation pattern — Logic Apps runs in Azure,
+ * we just send it the data and it does the rest.
  */
 
-const nodemailer = require("nodemailer");
-const QRCode = require("qrcode");
+const https = require('https');
+const url = require('url');
+const QRCode = require('qrcode');
 
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-};
-
-const buildTicketRows = async (tickets) => {
-  let html = "";
-  for (const ticket of tickets) {
-    const qrDataUrl = await QRCode.toDataURL(ticket.qrCode, { width: 120 });
-    html += `
-      <tr>
-        <td style="padding:10px;border:1px solid #e5e7eb;">${ticket.id}</td>
-        <td style="padding:10px;border:1px solid #e5e7eb;">${ticket.seatNumber || "General Admission"}</td>
-        <td style="padding:10px;border:1px solid #e5e7eb;">${ticket.status}</td>
-        <td style="padding:10px;border:1px solid #e5e7eb;"><img src="${qrDataUrl}" width="100" height="100"/></td>
-      </tr>`;
-  }
-  return html;
-};
-
+/**
+ * Calls the Azure Logic Apps HTTP trigger to send a booking confirmation email.
+ * If LOGIC_APPS_URL is not set, falls back to console log (local dev mode).
+ */
 const sendBookingConfirmation = async (toEmail, booking, tickets) => {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.log(`[EMAIL] SMTP not configured — skipping confirmation to ${toEmail}`);
+  // Build QR code data URLs for all tickets
+  const ticketsWithQR = [];
+  for (const ticket of tickets) {
+    const qrDataUrl = await QRCode.toDataURL(ticket.qrCode, { width: 150 });
+    ticketsWithQR.push({
+      ticketId:   ticket.id,
+      seatNumber: ticket.seatNumber || 'General Admission',
+      status:     ticket.status,
+      qrCode:     ticket.qrCode,
+      qrDataUrl,
+    });
+  }
+
+  const payload = {
+    toEmail,
+    userName:      booking.user?.name || 'Guest',
+    bookingId:     booking.id,
+    eventTitle:    booking.event?.title || 'Event',
+    eventVenue:    booking.event?.venue || '',
+    eventDate:     booking.event?.eventDate
+                     ? new Date(booking.event.eventDate).toLocaleDateString('en-AE', {
+                         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                       })
+                     : '',
+    totalAmount:   parseFloat(booking.totalAmount).toFixed(2),
+    ticketCount:   tickets.length,
+    tickets:       ticketsWithQR,
+    generatedAt:   new Date().toISOString(),
+  };
+
+  const logicAppsUrl = process.env.LOGIC_APPS_URL;
+
+  if (!logicAppsUrl) {
+    // Local development — just log to console
+    console.log(`[EMAIL] LOGIC_APPS_URL not set. Would send to: ${toEmail}`);
+    console.log(`[EMAIL] Booking #${booking.id} confirmed, ${tickets.length} ticket(s) generated`);
     return;
   }
 
   try {
-    const ticketRows = await buildTicketRows(tickets);
-    const transporter = createTransporter();
+    await httpPost(logicAppsUrl, payload);
+    console.log(`[EMAIL] Logic Apps triggered successfully for ${toEmail}`);
+  } catch (err) {
+    // Never crash the payment flow if email fails
+    console.error(`[EMAIL] Logic Apps call failed for ${toEmail}: ${err.message}`);
+  }
+};
 
-    const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333;">
-      <div style="background:#4F46E5;padding:24px;border-radius:8px 8px 0 0;">
-        <h1 style="color:#fff;margin:0;font-size:24px;">🎟 Booking Confirmed!</h1>
-      </div>
-      <div style="padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
-        <p>Hi <strong>${booking.user?.name || "there"}</strong>! Your booking <strong>#${booking.id}</strong> is confirmed.</p>
-        <p><strong>Event:</strong> ${booking.event?.title}</p>
-        <p><strong>Venue:</strong> ${booking.event?.venue}</p>
-        <p><strong>Total Paid:</strong> $${booking.totalAmount}</p>
-        <br/>
-        <table style="border-collapse:collapse;width:100%;">
-          <thead>
-            <tr style="background:#f9fafb;">
-              <th style="padding:10px;border:1px solid #e5e7eb;text-align:left;">Ticket ID</th>
-              <th style="padding:10px;border:1px solid #e5e7eb;text-align:left;">Seat</th>
-              <th style="padding:10px;border:1px solid #e5e7eb;text-align:left;">Status</th>
-              <th style="padding:10px;border:1px solid #e5e7eb;text-align:left;">QR Code</th>
-            </tr>
-          </thead>
-          <tbody>${ticketRows}</tbody>
-        </table>
-        <p style="margin-top:20px;color:#6b7280;font-size:12px;">
-          Present your QR code at the venue. Each QR code is unique and single-use.
-        </p>
-      </div>
-    </div>`;
+/** Simple HTTP POST helper — no extra dependencies needed */
+const httpPost = (targetUrl, body) => {
+  return new Promise((resolve, reject) => {
+    const parsed   = url.parse(targetUrl);
+    const data     = JSON.stringify(body);
+    const options  = {
+      hostname: parsed.hostname,
+      path:     parsed.path,
+      method:   'POST',
+      headers:  {
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(data),
+      },
+    };
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: toEmail,
-      subject: `Booking Confirmed #${booking.id} — Your Tickets`,
-      html,
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      res.on('data', (chunk) => { responseData += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(responseData);
+        } else {
+          reject(new Error(`Logic Apps returned HTTP ${res.statusCode}: ${responseData}`));
+        }
+      });
     });
 
-    console.log(`[EMAIL] Confirmation sent to ${toEmail}`);
-  } catch (err) {
-    console.error(`[EMAIL] Failed to send to ${toEmail}:`, err.message);
-  }
+    req.on('error', reject);
+    req.write(data);
+    req.end();
+  });
 };
 
 module.exports = { sendBookingConfirmation };

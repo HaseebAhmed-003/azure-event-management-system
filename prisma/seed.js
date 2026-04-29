@@ -27,7 +27,7 @@ async function main() {
     create: {
       name: "Admin User",
       email: "admin@eventsystem.com",
-      passwordHash: await bcrypt.hash("admin123", 10),
+      password: await bcrypt.hash("admin123", 10),
       role: "ADMIN",
     },
   });
@@ -38,7 +38,7 @@ async function main() {
     create: {
       name: "Event Organizer",
       email: "organizer@eventsystem.com",
-      passwordHash: await bcrypt.hash("organizer123", 10),
+      password: await bcrypt.hash("organizer123", 10),
       role: "ORGANIZER",
     },
   });
@@ -49,7 +49,7 @@ async function main() {
     create: {
       name: "Test Attendee",
       email: "attendee@eventsystem.com",
-      passwordHash: await bcrypt.hash("attendee123", 10),
+      password: await bcrypt.hash("attendee123", 10),
       role: "ATTENDEE",
     },
   });
@@ -69,8 +69,7 @@ async function main() {
       eventDate: new Date("2026-09-15T09:00:00Z"),
       totalSeats: 200,
       availableSeats: 200,
-      ticketPrice: 500.0,
-      isFree: false,
+      price: 500.0,
       status: "PUBLISHED",
       organizerId: organizer.id,
     },
