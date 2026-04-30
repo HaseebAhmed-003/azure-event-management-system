@@ -32,14 +32,15 @@ jobs:
 
       - name: Prepare deployment folder
         run: |
-          mkdir -p deploy-frontend
-          cp -r event-frontend/build/* deploy-frontend/
-          cp event-frontend/server.js deploy-frontend/server.js
-          echo '{"name":"frontend","version":"1.0.0","scripts":{"start":"node server.js"},"dependencies":{"express":"^4.19.2"}}' > deploy-frontend/package.json
-          cd deploy-frontend && npm install --omit=dev
+          mkdir -p deploy-output
+          cp -r event-frontend/build/* deploy-output/
+          cp event-frontend/server.js deploy-output/server.js
+          echo '{"name":"frontend","version":"1.0.0","scripts":{"start":"node server.js"},"dependencies":{"express":"^4.19.2"}}' > deploy-output/package.json
+          cd deploy-output && npm install --omit=dev
 
-      - name: Zip deployment folder
-        run: zip -r frontend-deploy.zip deploy-frontend/
+      - name: Zip deployment folder contents
+        working-directory: ./deploy-output
+        run: zip -r ../frontend-deploy.zip .
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
