@@ -1,21 +1,6 @@
-/**
- * Database Seeder — Group Member 1 (Fatima)
- *
- * Creates test accounts for all 3 roles so the team can test
- * every workflow without manually registering through the API.
- *
- * Run with: npm run db:seed
- *
- * Test accounts created:
- *   admin@eventsystem.com     / admin123      → ADMIN
- *   organizer@eventsystem.com / organizer123  → ORGANIZER
- *   attendee@eventsystem.com  / attendee123   → ATTENDEE
- *   + 1 published sample event (FAST Tech Fest 2026)
- */
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config();
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
-
 const prisma = new PrismaClient();
 
 async function main() {
@@ -27,7 +12,7 @@ async function main() {
     create: {
       name: "Admin User",
       email: "admin@eventsystem.com",
-      password: await bcrypt.hash("admin123", 10),
+      passwordHash: await bcrypt.hash("admin123", 10),
       role: "ADMIN",
     },
   });
@@ -38,7 +23,7 @@ async function main() {
     create: {
       name: "Event Organizer",
       email: "organizer@eventsystem.com",
-      password: await bcrypt.hash("organizer123", 10),
+      passwordHash: await bcrypt.hash("organizer123", 10),
       role: "ORGANIZER",
     },
   });
@@ -49,7 +34,7 @@ async function main() {
     create: {
       name: "Test Attendee",
       email: "attendee@eventsystem.com",
-      password: await bcrypt.hash("attendee123", 10),
+      passwordHash: await bcrypt.hash("attendee123", 10),
       role: "ATTENDEE",
     },
   });
@@ -69,7 +54,8 @@ async function main() {
       eventDate: new Date("2026-09-15T09:00:00Z"),
       totalSeats: 200,
       availableSeats: 200,
-      price: 500.0,
+      ticketPrice: 500.0,
+      isFree: false,
       status: "PUBLISHED",
       organizerId: organizer.id,
     },
