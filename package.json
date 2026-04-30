@@ -4,18 +4,18 @@
   "description": "Event Management and QR Attendance System — Milestone 3",
   "main": "src/index.js",
   "scripts": {
-  "start": "node src/index.js",
-  "dev": "nodemon src/index.js",
-  "db:push": "npx prisma db push",
-  "db:studio": "npx prisma studio",
-  "db:seed": "node prisma/seed.js",
-  "postinstall": "npx prisma generate"
-},
-"engines": {
-  "node": ">=18.0.0"
-},
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "db:push": "npx prisma db push",
+    "db:studio": "npx prisma studio",
+    "db:seed": "node prisma/seed.js",
+    "postinstall": "npx prisma generate"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
-    "@prisma/client": "^5.13.0",
+    "@prisma/client": "^5.22.0",
     "applicationinsights": "^3.14.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

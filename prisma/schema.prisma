@@ -9,55 +9,56 @@ datasource db {
 
 model User {
   id              Int          @id @default(autoincrement())
-  name            String
-  email           String       @unique
-  password        String
+  name            String       @db.VarChar(100)
+  email           String       @unique @db.VarChar(150)
+  passwordHash    String       @map("password_hash") @db.VarChar(255)
   role            String       @default("ATTENDEE")
+  isActive        Boolean      @default(true) @map("is_active")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
-  events          Event[]      @relation("OrganizerEvents")
+  scanLogs        Attendance[] @relation("ScannedBy")
   bookings        Booking[]
+  organizedEvents Event[]      @relation("OrganizerEvents")
   tickets         Ticket[]
-  attendance      Attendance[] @relation("ScannedBy")
-  reviews         Review[]
 
   @@map("users")
 }
 
 model Event {
-  id              Int          @id @default(autoincrement())
-  title           String
-  description     String?      @db.NVarChar(Max)
-  venue           String?
-  eventDate       DateTime     @map("event_date")
-  totalSeats      Int          @map("total_seats")
-  availableSeats  Int          @map("available_seats")
-  price           Float
-  status          String       @default("DRAFT")
-  organizerId     Int          @map("organizer_id")
-  imageUrl        String?      @map("image_url")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  organizer       User         @relation("OrganizerEvents", fields: [organizerId], references: [id], onUpdate: NoAction, onDelete: NoAction)
-  bookings        Booking[]
-  tickets         Ticket[]
-  attendance      Attendance[]
-  reviews         Review[]
+  id             Int          @id @default(autoincrement())
+  title          String       @db.VarChar(200)
+  description    String?      @db.NVarChar(Max)
+  venue          String       @db.VarChar(200)
+  eventDate      DateTime     @map("event_date")
+  totalSeats     Int          @map("total_seats")
+  availableSeats Int          @map("available_seats")
+  ticketPrice    Decimal      @default(0.00) @map("ticket_price") @db.Decimal(10, 2)
+  isFree         Boolean      @default(false) @map("is_free")
+  bannerUrl      String?      @map("banner_url") @db.VarChar(500)
+  status         String       @default("DRAFT")
+  organizerId    Int          @map("organizer_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  attendance     Attendance[]
+  bookings       Booking[]
+  organizer      User         @relation("OrganizerEvents", fields: [organizerId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  tickets        Ticket[]
 
   @@map("events")
 }
 
 model Booking {
-  id              Int      @id @default(autoincrement())
-  userId          Int      @map("user_id")
-  eventId         Int      @map("event_id")
-  status          String   @default("PENDING")
-  totalAmount     Float    @map("total_amount")
-  ticketCount     Int      @map("ticket_count")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  event           Event    @relation(fields: [eventId], references: [id], onUpdate: NoAction, onDelete: NoAction)
-  user            User     @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  eventId         Int       @map("event_id")
+  quantity        Int       @default(1)
+  totalAmount     Decimal   @map("total_amount") @db.Decimal(10, 2)
+  status          String    @default("PENDING")
+  stripeSessionId String?   @unique @map("stripe_session_id") @db.VarChar(300)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  event           Event     @relation(fields: [eventId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  user            User      @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
   payment         Payment?
   tickets         Ticket[]
 
@@ -65,60 +66,50 @@ model Booking {
 }
 
 model Payment {
-  id              Int      @id @default(autoincrement())
-  bookingId       Int      @unique @map("booking_id")
-  amount          Float
-  status          String   @default("PENDING")
-  stripePaymentId String?  @map("stripe_payment_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  booking         Booking  @relation(fields: [bookingId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  id                  Int       @id @default(autoincrement())
+  bookingId           Int       @unique @map("booking_id")
+  amount              Decimal   @db.Decimal(10, 2)
+  currency            String    @default("usd") @db.VarChar(10)
+  status              String    @default("PENDING")
+  stripePaymentIntent String?   @map("stripe_payment_intent") @db.VarChar(300)
+  stripeSessionId     String?   @map("stripe_session_id") @db.VarChar(300)
+  paidAt              DateTime? @map("paid_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  booking             Booking   @relation(fields: [bookingId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 
   @@map("payments")
 }
 
 model Ticket {
-  id          Int        @id @default(autoincrement())
-  bookingId   Int        @map("booking_id")
-  eventId     Int        @map("event_id")
-  userId      Int        @map("user_id")
-  qrCode      String     @unique @map("qr_code")
-  seatNumber  String?    @map("seat_number")
-  status      String     @default("ACTIVE")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  attendance  Attendance?
-  booking     Booking    @relation(fields: [bookingId], references: [id], onUpdate: NoAction, onDelete: NoAction)
-  event       Event      @relation(fields: [eventId], references: [id], onUpdate: NoAction, onDelete: NoAction)
-  user        User       @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  id         Int         @id @default(autoincrement())
+  qrCode     String      @unique @map("qr_code") @db.VarChar(300)
+  userId     Int         @map("user_id")
+  eventId    Int         @map("event_id")
+  bookingId  Int         @map("booking_id")
+  status     String      @default("ACTIVE")
+  seatNumber String?     @map("seat_number") @db.VarChar(20)
+  issuedAt   DateTime    @default(now()) @map("issued_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  attendance Attendance?
+  booking    Booking     @relation(fields: [bookingId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  event      Event       @relation(fields: [eventId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  user       User        @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 
   @@map("tickets")
 }
 
 model Attendance {
-  id            Int      @id @default(autoincrement())
-  ticketId      Int?     @unique @map("ticket_id")
-  eventId       Int?     @map("event_id")
-  scannedBy     Int      @map("scanned_by")
-  status        String   @default("PRESENT")
-  scannedAt     DateTime @default(now()) @map("scanned_at")
-  notes         String?
-  event         Event?   @relation(fields: [eventId], references: [id], onUpdate: NoAction, onDelete: NoAction)
-  scannedByUser User     @relation("ScannedBy", fields: [scannedBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
-  ticket        Ticket?  @relation(fields: [ticketId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  id            Int       @id @default(autoincrement())
+  ticketId      Int?      @unique @map("ticket_id")
+  eventId       Int?      @map("event_id")
+  scannedBy     Int       @map("scanned_by")
+  status        String
+  scanTime      DateTime  @default(now()) @map("scan_time")
+  notes         String?   @db.NVarChar(Max)
+  event         Event?    @relation(fields: [eventId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  scannedByUser User      @relation("ScannedBy", fields: [scannedBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  ticket        Ticket?   @relation(fields: [ticketId], references: [id], onUpdate: NoAction, onDelete: NoAction)
 
   @@map("attendance")
-}
-
-model Review {
-  id             Int      @id @default(autoincrement())
-  userId         Int      @map("user_id")
-  eventId        Int      @map("event_id")
-  reviewText     String   @map("review_text") @db.NVarChar(Max)
-  sentimentLabel String?  @map("sentiment_label")
-  sentimentScore Float?   @map("sentiment_score")
-  createdAt      DateTime @default(now()) @map("created_at")
-  user           User     @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
-  event          Event    @relation(fields: [eventId], references: [id], onUpdate: NoAction, onDelete: NoAction)
-
-  @@map("reviews")
 }
