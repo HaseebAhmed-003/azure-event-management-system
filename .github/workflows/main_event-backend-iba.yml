@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -24,9 +25,12 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Zip package
+        run: zip -r deploy.zip . -x "event-frontend/*" -x ".git/*" -x "*.zip"
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'event-backend-iba'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
-          package: .
+          package: deploy.zip
