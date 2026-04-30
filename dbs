@@ -1,0 +1,1 @@
+DATABASE_URL="postgresql://pgadmin:YourPassword@event-pg-server.postgres.database.azure.com:5432/event_system_db?sslmode=require"
