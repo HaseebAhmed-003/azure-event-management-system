@@ -1,0 +1,72 @@
+WORKFLOW 1: User Ticket Booking
+Description:
+This workflow explains how a user books an event ticket through the system.
+Steps:
+User opens the web application.
+User signs up or logs into their account.
+User browses the list of available events.
+User selects a specific event.
+Event details (date, venue, price, seats) are displayed.
+User selects number of tickets.
+System checks seat availability
+User proceeds to online payment
+Payment is processed successfully.
+System confirms the booking.
+A unique QR code ticket is generated.
+Confirmation email is sent to the user.
+
+
+Key Features Involved:
+User authentication
+Event browsing
+Online payment
+Seat management
+QR code generation
+Email notification
+
+WORKFLOW 2: Organizer Event Creation
+
+Description:
+This workflow explains how an organizer creates and manages an event.
+
+Steps:
+1. Organizer logs into the system.
+2. Organizer accesses the dashboard.
+3. Clicks on “Create Event”.
+4. Enters event title and description.
+5. Adds date and time.
+6. Enters venue/location.
+7. Sets ticket price (free/paid).
+8. Defines seat capacity.
+9. Uploads event banner/image.
+10. Submits the event form.
+11. System validates entered data.
+12. Event is stored in database.
+13. Event becomes visible to users.
+
+Key Features Involved:
+● Role-based login
+● Event management system
+● Database storage
+● Organizer dashboard
+
+WORKFLOW 3: QR Code Scanning & Attendance
+Description:
+This workflow explains how attendance is marked using QR code tickets.
+Steps:
+User arrives at the event venue.
+Organizer opens QR scanner in system.
+User presents QR code ticket.
+Organizer scans the QR code.
+System retrieves ticket data.
+System verifies ticket authenticity.
+If valid → entry is allowed.
+Attendance is marked automatically.
+Seat count is updated.
+If QR is scanned again → duplicate entry is blocked.
+Key Features Involved:
+QR code validation
+Attendance tracking
+Real-time seat management
+Fraud prevention
+
