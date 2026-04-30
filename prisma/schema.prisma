@@ -1,0 +1,174 @@
+// =====================================================================
+// Prisma Schema — Event Management & QR Attendance System
+// ---------------------------------------------------------------------
+// This file defines the structure of all database tables.
+//
+// Tables (Models):
+//   User        — people who use the app (attendees, organizers, admins)
+//   Event       — events created by organizers
+//   Booking     — when a user books tickets for an event
+//   Payment     — payment record for each booking
+//   Ticket      — individual QR ticket given after payment
+//   Attendance  — log of every QR scan attempt at the venue
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ATTENDEE
+  ORGANIZER
+  ADMIN
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum TicketStatus {
+  ACTIVE
+  USED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  DUPLICATE
+  INVALID
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(150)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         Role     @default(ATTENDEE)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  organizedEvents Event[]      @relation("OrganizerEvents")
+  bookings        Booking[]
+  tickets         Ticket[]
+  scanLogs        Attendance[] @relation("ScannedBy")
+
+  @@map("users")
+}
+
+model Event {
+  id             Int         @id @default(autoincrement())
+  title          String      @db.VarChar(200)
+  description    String?     @db.Text
+  venue          String      @db.VarChar(200)
+  eventDate      DateTime    @map("event_date")
+  totalSeats     Int         @map("total_seats")
+  availableSeats Int         @map("available_seats")
+  ticketPrice    Decimal     @default(0.00) @map("ticket_price") @db.Decimal(10, 2)
+  isFree         Boolean     @default(false) @map("is_free")
+  bannerUrl      String?     @map("banner_url") @db.VarChar(500)
+  status         EventStatus @default(DRAFT)
+  organizerId    Int         @map("organizer_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  organizer  User         @relation("OrganizerEvents", fields: [organizerId], references: [id])
+  bookings   Booking[]
+  tickets    Ticket[]
+  attendance Attendance[]
+
+  @@map("events")
+}
+
+model Booking {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  eventId         Int           @map("event_id")
+  quantity        Int           @default(1)
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
+  status          BookingStatus @default(PENDING)
+  stripeSessionId String?       @unique @map("stripe_session_id") @db.VarChar(300)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  user    User     @relation(fields: [userId], references: [id])
+  event   Event    @relation(fields: [eventId], references: [id])
+  payment Payment?
+  tickets Ticket[]
+
+  @@map("bookings")
+}
+
+model Payment {
+  id                  Int           @id @default(autoincrement())
+  bookingId           Int           @unique @map("booking_id")
+  amount              Decimal       @db.Decimal(10, 2)
+  currency            String        @default("usd") @db.VarChar(10)
+  status              PaymentStatus @default(PENDING)
+  stripePaymentIntent String?       @map("stripe_payment_intent") @db.VarChar(300)
+  stripeSessionId     String?       @map("stripe_session_id") @db.VarChar(300)
+  paidAt              DateTime?     @map("paid_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@map("payments")
+}
+
+model Ticket {
+  id         Int          @id @default(autoincrement())
+  qrCode     String       @unique @map("qr_code") @db.VarChar(300)
+  userId     Int          @map("user_id")
+  eventId    Int          @map("event_id")
+  bookingId  Int          @map("booking_id")
+  status     TicketStatus @default(ACTIVE)
+  seatNumber String?      @map("seat_number") @db.VarChar(20)
+  issuedAt   DateTime     @default(now()) @map("issued_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  user       User        @relation(fields: [userId], references: [id])
+  event      Event       @relation(fields: [eventId], references: [id])
+  booking    Booking     @relation(fields: [bookingId], references: [id])
+  attendance Attendance?
+
+  @@map("tickets")
+}
+
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  ticketId  Int?             @unique @map("ticket_id")
+  eventId   Int?             @map("event_id")
+  scannedBy Int              @map("scanned_by")
+  status    AttendanceStatus
+  scanTime  DateTime         @default(now()) @map("scan_time")
+  notes     String?          @db.Text
+
+  ticket        Ticket? @relation(fields: [ticketId], references: [id])
+  event         Event?  @relation(fields: [eventId], references: [id])
+  scannedByUser User    @relation("ScannedBy", fields: [scannedBy], references: [id])
+
+  @@map("attendance")
+}
