@@ -30,19 +30,16 @@ jobs:
           REACT_APP_API_URL: https://event-backend-iba-fzbkbpdqb6f9f2am.uaenorth-01.azurewebsites.net
           CI: false
 
-      - name: Copy server files into build
-        working-directory: ./event-frontend
+      - name: Prepare deployment folder
         run: |
-          cp server.js build/server.js
-          cp package.json build/package.json
+          mkdir -p deploy-frontend
+          cp -r event-frontend/build/* deploy-frontend/
+          cp event-frontend/server.js deploy-frontend/server.js
+          echo '{"name":"frontend","version":"1.0.0","scripts":{"start":"node server.js"},"dependencies":{"express":"^4.19.2"}}' > deploy-frontend/package.json
+          cd deploy-frontend && npm install --omit=dev
 
-      - name: Install production deps in build folder
-        working-directory: ./event-frontend/build
-        run: npm install --omit=dev
-
-      - name: Zip build folder
-        working-directory: ./event-frontend/build
-        run: zip -r ../../frontend-deploy.zip .
+      - name: Zip deployment folder
+        run: zip -r frontend-deploy.zip deploy-frontend/
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
