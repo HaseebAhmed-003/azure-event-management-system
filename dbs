@@ -1,1 +1,25 @@
 DATABASE_URL="postgresql://pgadmin:YourPassword@event-pg-server.postgres.database.azure.com:5432/event_system_db?sslmode=require"
+cat.env : The term 'cat.env' is not recognized as the name of a 
+cmdlet, function, script file, or operable program. Check the spelling 
+of the name, or if a path was included, verify that the path is 
+correct and try again.
+At line:1 char:1
++ cat.env
++ ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (cat.env:String) [], Com 
+   mandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+PS C:\Users\testiba\Downloads\Cloud> nano.env
+nano.env : The term 'nano.env' is not recognized as the name of a 
+cmdlet, function, script file, or operable program. Check the spelling 
+of the name, or if a path was included, verify that the path is 
+correct and try again.
+At line:1 char:1
++ nano.env
++ ~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (nano.env:String) [], Co 
+   mmandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+PS C:\Users\testiba\Downloads\Cloud> 
