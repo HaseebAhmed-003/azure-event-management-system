@@ -1,7 +1,4 @@
-/**
- * Event Service — Workflow 2 (Organizer Event Creation)
- * Handles: event CRUD, banner upload, publish workflow, seat management.
- */
+
 
 const prisma = require("../lib/prisma");
 

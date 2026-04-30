@@ -1,32 +1,3 @@
-/**
- * EventDetail.js — Member 2: Haseeb Ahmed
- *
- * Event detail page + booking flow at /events/:id (Workflow 2).
- *
- * Step state machine — 'browse' | 'payment' | 'done':
- *
- *   'browse':
- *     Shows event details, banner, seat count, price.
- *     User picks a quantity (1–10, max available).
- *     "Book Now" → calls createBooking({ eventId, quantity })
- *                   POST /api/bookings
- *                → on success: stores bookingId, moves to 'payment'
- *
- *   'payment':
- *     Shows booking summary + total cost.
- *     "Confirm Payment" → simulatePayment(bookingId, true)
- *                          POST /api/payments/simulate/:bookingId
- *                       → tickets generated, moves to 'done'
- *     "Simulate Failure" → simulatePayment(bookingId, false)
- *                        → booking cancelled, seats restored, back to 'browse'
- *
- *   'done':
- *     Shows success message with ticket count.
- *     "View My Tickets" navigates to /my-tickets.
- *
- * Organizers see a warning instead of the booking widget.
- * Guests see a "Sign in to Book" button instead.
- */
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';

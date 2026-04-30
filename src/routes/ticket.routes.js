@@ -1,13 +1,4 @@
-/**
- * Ticket Routes — (QR Ticket Generation)
- * GET    /api/tickets/my                   [Attendee]
- * GET    /api/tickets/booking/:bookingId   [Owner]
- * GET    /api/tickets/event/:eventId       [Organizer]
- * GET    /api/tickets/:id
- * GET    /api/tickets/:id/qr              — returns base64 QR PNG
- * PUT    /api/tickets/:id                  [Organizer]
- * DELETE /api/tickets/:id                  [Owner/Organizer]
- */
+
 
 const express = require("express");
 const router = express.Router();

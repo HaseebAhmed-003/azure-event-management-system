@@ -1,20 +1,4 @@
 
-// handleCancel(id):
-//     1. Confirms with window.confirm() first
-//     2. Sets cancelling state to show loading on that button
-//     3. Calls cancelBooking(id) → DELETE /api/bookings/:id
-//     4. Optimistic update: immediately maps over bookings array
-//        and sets status = 'CANCELLED' for the matching id.
-//        This updates the UI without a full page reload.
-
-// Status badge colours:
-//     CONFIRMED → green   PENDING → yellow
-//     CANCELLED → red     REFUNDED → grey
-
-//  "View Tickets" button appears only on CONFIRMED bookings.
-//  "Cancel" button appears only on PENDING or CONFIRMED bookings.
-
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getMyBookings, cancelBooking } from '../api';

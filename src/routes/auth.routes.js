@@ -1,14 +1,3 @@
-/**
- * Auth Routes — Group Member 1 (Fatima)
- *
- * POST   /api/auth/register       — create account (public)
- * POST   /api/auth/login          — get token (public)
- * GET    /api/auth/me             — get own profile (need token)
- * GET    /api/auth/users          — list all users (admin only)
- * GET    /api/auth/users/:id      — get one user (need token)
- * PUT    /api/auth/users/:id      — update user (own or admin)
- * DELETE /api/auth/users/:id      — deactivate user (admin only)
- */
 
 const express = require("express");
 const router = express.Router();

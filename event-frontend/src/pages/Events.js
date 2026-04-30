@@ -1,26 +1,3 @@
-/**
- * Events.js — Member 2: Haseeb Ahmed
- *
- * Public event browse page at /events (Workflow 2 — browsing step).
- *
- * fetchEvents():
- *   Calls GET /api/events with optional query params:
- *   ?search= (title/description keyword)
- *   ?venue=  (venue name substring)
- *   ?from=   (events on or after this date, ISO format)
- *   ?to=     (events on or before this date, ISO format)
- *
- * Debouncing:
- *   Uses useEffect + setTimeout(350ms) + clearTimeout cleanup.
- *   This delays the API call until 350ms after the user stops
- *   typing, preventing one API request per keystroke.
- *
- * useCallback:
- *   fetchEvents is wrapped in useCallback so useEffect's
- *   dependency array doesn't cause an infinite re-render loop.
- *
- * Renders a responsive card grid. Each card links to /events/:id.
- */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';

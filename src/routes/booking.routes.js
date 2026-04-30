@@ -1,18 +1,4 @@
-/**
- * Booking Routes — Workflow 2 
- * Handles booking creation, retrieval, and cancellation.
- */
 
-/**
- * Booking Routes — Workflow 1 
- * POST   /api/bookings                     [Attendee]
- * GET    /api/bookings/my                  [Attendee]
- * GET    /api/bookings/admin/all           [Admin]
- * GET    /api/bookings/event/:eventId      [Organizer]
- * GET    /api/bookings/:id
- * PUT    /api/bookings/:id/status          [Admin]
- * DELETE /api/bookings/:id                 [Owner]
- */
 
 const express = require("express");
 const router = express.Router();

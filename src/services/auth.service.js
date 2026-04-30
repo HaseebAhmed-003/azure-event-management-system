@@ -1,14 +1,4 @@
-/**
- * Auth Service — Group Member 1 (Fatima)
- * Handles: register, login, and user management
- *
- * register() — creates a new user, hashes password, returns token
- * login()    — checks email/password, returns token if correct
- * getUserById(), listUsers(), updateUser(), deleteUser() — user CRUD
- *
- * Passwords are NEVER returned in responses (safeUser removes it).
- * deleteUser() does soft-delete — marks user inactive, does not delete the row.
- */
+
 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");

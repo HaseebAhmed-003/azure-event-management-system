@@ -1,16 +1,4 @@
 
-/**
- * Event Routes — Workflow 2 (Organizer Event Creation)
- * POST   /api/events                       [Organizer]
- * GET    /api/events                       [Public]
- * GET    /api/events/my                    [Organizer]
- * GET    /api/events/admin/all             [Admin]
- * GET    /api/events/:id                   [Public]
- * PUT    /api/events/:id                   [Organizer/Admin]
- * POST   /api/events/:id/publish           [Organizer/Admin]
- * POST   /api/events/:id/banner            [Organizer]
- * DELETE /api/events/:id                   [Organizer/Admin]
- */
 
 const express = require("express");
 const router = express.Router();

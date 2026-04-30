@@ -1,24 +1,4 @@
-/**
- * OrganizerDashboard.js — Member 2: Haseeb Ahmed
- *
- * Event stats dashboard at /organizer/events/:id/dashboard (Workflow 2).
- *
- * On mount — fires 3 API calls in parallel with Promise.all():
- *   1. getEventDashboard(id)  → GET /api/events/:id/dashboard
- *      Returns: stats { ticketsSold, totalRevenue, attendedCount,
- *               notYetArrived, fillRatePct, seatsRemaining }
- *   2. getEventAttendance(id) → GET /api/attendance/event/:id
- *      Returns: array of confirmed attendees with names and scan times
- *   3. getEventAttendanceSummary(id) → GET /api/attendance/event/:id/summary
- *      Returns: scan counts (present, duplicate, invalid, total)
- *
- * Fill rate bar:
- *   CSS width transition from 0 to fillRatePct% creates the animation.
- *
- * Attendees table:
- *   Shows name, email, seat number, scanned-at time for each
- *   confirmed attendee (status = PRESENT).
- */
+
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';

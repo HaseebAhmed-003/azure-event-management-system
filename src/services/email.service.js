@@ -1,8 +1,4 @@
-/**
- * Email Service — sends booking confirmation with QR code image attached.
- * Called automatically after a successful payment.
- * Uses Nodemailer. Configure SMTP settings in .env
- */
+
 
 const nodemailer = require("nodemailer");
 const QRCode = require("qrcode");

@@ -1,8 +1,4 @@
-/**
- * Payment Service — Workflow 1 
- * Handles: Stripe Checkout session creation, webhook processing,
- * free-event auto-confirm, ticket generation trigger.
- */
+
 
 const Stripe = require("stripe");
 const prisma = require("../lib/prisma");

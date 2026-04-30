@@ -1,7 +1,4 @@
-/**
- * Ticket Service — Workflow 3 (QR Ticket Generation)
- * Handles: unique QR code generation per ticket, base64 image, ticket CRUD.
- */
+
 
 const QRCode = require("qrcode");
 const { v4: uuidv4 } = require("uuid");

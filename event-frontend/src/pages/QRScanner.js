@@ -1,10 +1,4 @@
 
-// Result card:
-//     status = 'PRESENT'   → green card, "Entry Allowed"
-//                            shows attendeeName + seatNumber + scanTime
-//     status = 'DUPLICATE' → yellow card, "Duplicate — Already Scanned"
-//     status = 'INVALID'   → red card, "Invalid QR Code"
-//     status = 'ERROR'     → red card, shows error message
 
 
 import React, { useState, useRef } from 'react';

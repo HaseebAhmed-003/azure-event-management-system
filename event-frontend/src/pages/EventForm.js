@@ -1,31 +1,3 @@
-/**
- * EventForm.js — Member 2: Haseeb Ahmed
- *
- * Create AND Edit event form. Used at two routes:
- *   /organizer/events/new         → Create mode (isEdit = false)
- *   /organizer/events/:id/edit    → Edit mode   (isEdit = true)
- *
- * Mode detection:
- *   const { id } = useParams();
- *   const isEdit = Boolean(id);
- *   In Edit mode, getEvent(id) is called on mount to pre-fill the form.
- *
- * validate():
- *   Returns error string if title/venue/eventDate/totalSeats missing,
- *   or if totalSeats is less than 1, or ticketPrice is negative.
- *   Returns null if all checks pass.
- *
- * handleSubmit(e, shouldPublish):
- *   1. Runs validate() — stops on error
- *   2. Calls createEvent() or updateEvent() based on mode
- *   3. If banner file selected, calls uploadBanner(eventId, file)
- *      → sends multipart/form-data POST to /api/events/:id/banner
- *   4. If shouldPublish=true, calls publishEvent(eventId) after creation
- *   5. Redirects to /organizer/events on success
- *
- * Banner upload: hidden file input triggered by clicking a styled div.
- * Preview: URL.createObjectURL(file) shows image before saving.
- */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';

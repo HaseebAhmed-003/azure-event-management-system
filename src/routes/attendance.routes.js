@@ -1,14 +1,4 @@
-/**
- * Attendance Routes — Workflow 3 (QR Code Scanning & Attendance)
- *
- * POST   /api/attendance/scan                        [Organizer] — CORE WORKFLOW 3 ENDPOINT
- * GET    /api/attendance/event/:eventId              [Organizer] — confirmed attendees only
- * GET    /api/attendance/event/:eventId/all-scans    [Organizer] — fraud audit log
- * GET    /api/attendance/event/:eventId/summary      [Organizer] — real-time dashboard stats
- * GET    /api/attendance/:id                         [Organizer]
- * PUT    /api/attendance/:id                         [Organizer] — update notes
- * DELETE /api/attendance/:id                         [Admin]     — resets ticket to ACTIVE
- */
+
 
 const express = require("express");
 const router = express.Router();

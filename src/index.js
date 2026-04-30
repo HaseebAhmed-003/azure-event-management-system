@@ -1,17 +1,4 @@
-/**
- * Main Server File — Group Member 1 (Fatima)
- *
- * This file starts the Express server.
- * It connects all the route files so the API works.
- *
- * Routes registered:
- *   /api/auth        → login and register
- *   /api/events      → event management
- *   /api/bookings    → ticket booking
- *   /api/payments    → payments
- *   /api/tickets     → QR tickets
- *   /api/attendance  → QR scanning
- */
+
 
 require("dotenv").config();
 const express = require("express");

@@ -1,10 +1,5 @@
 # Event Ticketing System — Backend API
 
-**Milestone 3 — Backend Implementation**
-**Web-Based Application Development**
-
-**Group Members:** Haseeb Ahmed · Fatima Naeem · Afaf Irfan
-
 ---
 
 ## 1. Project Overview
@@ -49,8 +44,8 @@ This is the backend for an Event Ticketing System built for Milestone 3 of the W
 
 ### Step 1 — Clone the Repository
 ```bash
-git clone https://github.com/fatimanaeem2004/Web_Development_Project.git
-cd Web_Development_Project
+git clone https://github.com/haseebahmed003/azure-event-management-system.git
+cd azure-event-management-system
 ```
 
 ### Step 2 — Install Dependencies
@@ -187,20 +182,6 @@ Six Prisma models map to PostgreSQL tables. All foreign keys are enforced at the
 | db:push | `npm run db:push` | Push schema directly to DB (no migration file) |
 | db:studio | `npm run db:studio` | Open Prisma Studio — browser-based DB GUI |
 | db:seed | `npm run db:seed` | Seed test user accounts and sample event |
-
----
-
-## 8. Version Control Summary
-
-| Practice | Implementation Detail |
-|----------|-----------------------|
-| Branching | Separate branches per member and workflow: `fatima/feature/auth-and-setup`, `feature/events-bookings-payments`, `feature/tickets-qr-attendance/afaf`, `fix/decimal-seat-validation` |
-| Pull Requests | All features merged to main via pull requests. No direct pushes to main branch. |
-| Commit Messages | Consistently prefixed: `feat:` for new features, `fix:` for bug fixes, `docs:` for documentation, `chore:` for config changes. |
-| Collaboration | All three group members contributed to the commits. Work divided clearly by workflow and responsibility. |
-| Final State | All pull requests merged into main before submission deadline. Code in other branches was not submitted. |
-
-
 
 ---
 
@@ -1102,17 +1083,6 @@ Delete an attendance record and reset the linked ticket back to ACTIVE. Admin on
 | DELETE | `/api/attendance/:id` | Admin | Delete attendance record |
 
 
-
-
-
-
-Milestone 4 — Frontend Implementation and Integration*
-Web-Based Application Development*
-
-Group Members: Fatima Naeem · Haseeb Ahmed · Afaf Irfan
-
----
-
 ## 1. Project Overview
 
 EventHub is a full-stack web application for managing events, bookings, payments, and QR-based attendance tracking. It supports three user roles — Attendee, Organizer, and Admin — each with their own protected workflows.
@@ -1170,8 +1140,8 @@ The React frontend connects to an Express/PostgreSQL backend via a JWT-authentic
 
 ### Step 1 — Clone the Repository
 bash
-git clone https://github.com/fatimanaeem2004/Web_Development_Project.git
-cd Web_Development_Project
+git clone https://github.com/haseebahmed003/azure-event-management-system.git
+cd azure-event-management-system
 
 
 ---
@@ -1271,7 +1241,7 @@ Use the demo credentials above to log in, or register a new account.
 ---
 
 ## 5. Project Structure
-Web_Development_Project/
+azure-event-management-system/
 ├── event-frontend/              
 │   ├── public/
 │   │   └── index.html
@@ -1313,11 +1283,7 @@ Web_Development_Project/
 
 ---
 
-## 6. Team Contributions
 
-### Member 1 — Fatima Naeem
-
-Responsible for the entire frontend foundation and authentication layer:
 - src/api.js — Axios HTTP client with JWT request interceptor and 401 auto-logout response interceptor. Exports all API call functions for every backend endpoint.
 - src/AuthContext.js — React Context providing global auth state. Handles login, logout, and session re-hydration on page refresh using GET /api/auth/me.
 - src/index.css — Complete dark-theme CSS design system with custom properties, typography (DM Sans + Fraunces), buttons, cards, forms, badges, alerts, modals, tables, and responsive grid.
@@ -1332,9 +1298,7 @@ Responsible for the entire frontend foundation and authentication layer:
 
 ---
 
-### Member 2 — Haseeb Ahmed
 
-Responsible for event management pages and organizer tools:
 - src/pages/Events.js — Public event browser with search, venue and date filters, and paginated results grid.
 - src/pages/EventDetail.js — Event detail page with seat availability, booking form, and payment simulation.
 - src/pages/OrganizerEvents.js — Organizer's event list with create, publish, edit, and cancel actions.
@@ -1346,9 +1310,7 @@ Responsible for event management pages and organizer tools:
 
 ---
 
-### Member 3 — Afaf Irfan
 
-Responsible for attendee-facing pages and QR attendance:
 - src/pages/MyBookings.js — Attendee bookings list with payment simulation and cancellation.
 - src/pages/MyTickets.js — Attendee tickets with QR code display and ticket cancellation.
 - src/pages/QRScanner.js — Organizer QR scanner with real-time scan result feedback (valid / duplicate / invalid).

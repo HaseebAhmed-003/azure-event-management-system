@@ -1,7 +1,7 @@
 {
   "name": "event-system-backend",
   "version": "1.0.0",
-  "description": "Event Management and QR Attendance System — Milestone 3",
+  "description": "Event Management and QR Attendance System",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

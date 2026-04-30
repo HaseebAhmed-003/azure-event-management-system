@@ -1,9 +1,4 @@
-/**
- * Prisma Client Singleton — Group Member 1 (Fatima)
- *
- * Creates one shared database connection used by all service files.
- * Logging is enabled in development so we can see queries in the terminal.
- */
+
 
 const { PrismaClient } = require("@prisma/client");
 

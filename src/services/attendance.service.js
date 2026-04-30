@@ -1,7 +1,4 @@
-/**
- * Attendance Service — Workflow 3 (QR Scanning & Attendance)
- * Core workflow: scan → verify → block duplicates → mark present → update seats.
- */
+
 
 const prisma = require("../lib/prisma");
 

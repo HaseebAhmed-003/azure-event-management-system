@@ -1,12 +1,4 @@
-/**
- * Payment Routes — Workflow 1 
- * POST   /api/payments/checkout/:bookingId  [Attendee]
- * POST   /api/payments/webhook              [Stripe only]
- * GET    /api/payments/success              [Stripe redirect]
- * GET    /api/payments/cancel               [Stripe redirect]
- * GET    /api/payments/booking/:bookingId   [Owner/Admin]
- * GET    /api/payments/admin/all            [Admin]
- */
+
 
 const express = require("express");
 const router = express.Router();

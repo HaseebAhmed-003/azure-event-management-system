@@ -1,7 +1,4 @@
-/**
- * Booking Service — Workflow 1 
- * Handles: booking CRUD, seat reservation, cancellation.
- */
+
 
 const prisma = require("../lib/prisma");
 

@@ -1,19 +1,5 @@
 
 
-// Ticket card:
-//     Left colour stripe: gradient for ACTIVE, grey for USED/CANCELLED.
-//     Shows: Ticket #id, seat number, event name, venue, date, status badge.
-//   
-//   GET /api/tickets/:id/qr
-//     Response: { qrImageBase64: "data:image/png;base64,..." }
-//     Sets the base64 string as the src of an <img> in the modal.
-//     Shows the raw QR code string below the image for scanner use.
-//   
-//   Download button:
-//     <a href="/api/tickets/:id/qr/download" download>
-//     Points directly to the backend. Browser saves it as ticket-N-qr.png.
-
-
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';

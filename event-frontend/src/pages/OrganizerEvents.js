@@ -1,24 +1,3 @@
-/**
- * OrganizerEvents.js — Member 2: Haseeb Ahmed
- *
- * Organizer event management table at /organizer/events (Workflow 2).
- *
- * On mount: calls getMyEvents() → GET /api/events/my
- *   Returns only events created by the logged-in organizer.
- *
- * handlePublish(id):
- *   Calls publishEvent(id) → POST /api/events/:id/publish
- *   Updates status to 'PUBLISHED' in local state (no full reload).
- *
- * handleDelete(id, title):
- *   Confirms with window.confirm() first.
- *   Calls deleteEvent(id) → DELETE /api/events/:id
- *   Updates status to 'CANCELLED' in local state.
- *
- * Each table row shows: title, date, venue, price, seats, status badge,
- * and action buttons: Stats | Edit | Publish | View | Cancel
- * (buttons shown/hidden based on current status).
- */
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';

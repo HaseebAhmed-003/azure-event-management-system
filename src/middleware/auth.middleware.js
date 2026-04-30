@@ -1,19 +1,4 @@
-/**
- * Auth Middleware — Group Member 1 (Fatima)
- *
- * authenticate:
- *   Checks the token sent in the request header.
- *   If valid, finds the user in the database and attaches
- *   them to req.user so other route handlers can use it.
- *
- * requireOrganizer:
- *   Only lets ORGANIZER or ADMIN users through.
- *   Used on routes like "create event".
- *
- * requireAdmin:
- *   Only lets ADMIN users through.
- *   Used on routes like "list all users".
- */
+
 
 const jwt = require("jsonwebtoken");
 const prisma = require("../lib/prisma");

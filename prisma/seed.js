@@ -1,17 +1,4 @@
-/**
- * Database Seeder — Group Member 1 (Fatima)
- *
- * Creates test accounts for all 3 roles so the team can test
- * every workflow without manually registering through the API.
- *
- * Run with: npm run db:seed
- *
- * Test accounts created:
- *   admin@eventsystem.com     / admin123      → ADMIN
- *   organizer@eventsystem.com / organizer123  → ORGANIZER
- *   attendee@eventsystem.com  / attendee123   → ATTENDEE
- *   + 1 published sample event (FAST Tech Fest 2026)
- */
+
 
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
