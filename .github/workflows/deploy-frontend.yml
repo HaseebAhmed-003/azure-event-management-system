@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -29,9 +30,13 @@ jobs:
           REACT_APP_API_URL: https://event-backend-iba-fzbkbpdqb6f9f2am.uaenorth-01.azurewebsites.net
           CI: false
 
+      - name: Zip frontend package
+        working-directory: ./event-frontend
+        run: zip -r ../frontend-deploy.zip . -x "node_modules/*" -x ".git/*" -x "src/*" -x "*.zip"
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'event-frontend-iba'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_FRONTEND }}
-          package: ./event-frontend
+          package: ./frontend-deploy.zip
