@@ -1,64 +1,67 @@
+const { getPrisma } = require("../lib/prisma");
 
+/** always get prisma inside functions */
+const getDB = () => getPrisma();
 
-const prisma = require("../lib/prisma");
-
-// ── Internal log helper ─────────────────────────────────────────────
-
+// ─────────────────────────────────────────────
+// LOG SCAN
+// ─────────────────────────────────────────────
 const logScan = async (ticketId, eventId, scannedBy, status, notes) => {
-  // For DUPLICATE and INVALID statuses,create a new row
-  // and never touch the existing PRESENT record
-  if (!ticketId || status === "DUPLICATE" || status === "INVALID") {
-    return prisma.attendance.create({
-      data: {
-        ticketId: null,
-        eventId,
-        scannedBy,
-        status,
-        notes,
-      },
-    });
-  }
+  const prisma = getDB();
 
-  // Only upsert for PRESENT — the first valid scan
-  return prisma.attendance.upsert({
-    where: { ticketId },
-    update: { status, notes, scannedBy, scanTime: new Date() },
-    create: { ticketId, eventId, scannedBy, status, notes },
+  return prisma.attendance.create({
+    data: {
+      ticketId: ticketId || null,
+      eventId: eventId || null,
+      scannedBy,
+      status,
+      notes,
+    },
   });
 };
 
-
-// ── Core scan workflow ───────────────────────────────────────────────
-
+// ─────────────────────────────────────────────
+// SCAN QR
+// ─────────────────────────────────────────────
 const scanQrCode = async ({ qrCode, scannedBy }) => {
+  const prisma = getDB();
   const now = new Date();
 
-  // Retrieve ticket by QR code string
   const ticket = await prisma.ticket.findUnique({
     where: { qrCode },
     include: { user: { select: { name: true } } },
   });
 
   if (!ticket) {
-    await logScan(null, null, scannedBy, "INVALID", "QR code not found in system");
+    await logScan(null, null, scannedBy, "INVALID", "QR not found");
     return {
       success: false,
       status: "INVALID",
-      message: "Invalid QR code — not found in system",
+      message: "Invalid QR code",
       scanTime: now,
     };
   }
 
-  // Check for duplicate — already has a PRESENT attendance record
   const existing = await prisma.attendance.findFirst({
-    where: { ticketId: ticket.id, status: "PRESENT" },
+    where: {
+      ticketId: ticket.id,
+      status: "PRESENT",
+    },
   });
+
   if (existing) {
-    await logScan(ticket.id, ticket.eventId, scannedBy, "DUPLICATE", "Ticket already scanned");
+    await logScan(
+      ticket.id,
+      ticket.eventId,
+      scannedBy,
+      "DUPLICATE",
+      "Already scanned"
+    );
+
     return {
       success: false,
       status: "DUPLICATE",
-      message: "Duplicate entry blocked — this ticket has already been scanned",
+      message: "Already scanned",
       ticketId: ticket.id,
       eventId: ticket.eventId,
       attendeeName: ticket.user?.name,
@@ -66,87 +69,101 @@ const scanQrCode = async ({ qrCode, scannedBy }) => {
     };
   }
 
-  // Validate ticket status
   if (ticket.status === "CANCELLED") {
-    await logScan(ticket.id, ticket.eventId, scannedBy, "INVALID", "Cancelled ticket");
+    await logScan(
+      ticket.id,
+      ticket.eventId,
+      scannedBy,
+      "INVALID",
+      "Cancelled"
+    );
+
     return {
       success: false,
       status: "INVALID",
-      message: "Ticket is cancelled and not valid for entry",
-      ticketId: ticket.id,
-      eventId: ticket.eventId,
-      scanTime: now,
-    };
-  }
-  if (ticket.status === "USED") {
-    await logScan(ticket.id, ticket.eventId, scannedBy, "DUPLICATE", "Already-used ticket");
-    return {
-      success: false,
-      status: "DUPLICATE",
-      message: "Ticket has already been used",
-      ticketId: ticket.id,
-      eventId: ticket.eventId,
-      scanTime: now,
+      message: "Ticket cancelled",
     };
   }
 
-  // Valid → mark USED, record attendance
-  const [attendance] = await prisma.$transaction([
-    prisma.attendance.create({
-      data: {
-        ticketId: ticket.id,
-        eventId: ticket.eventId,
-        scannedBy,
-        status: "PRESENT",
-        notes: "Entry granted",
-      },
-    }),
-    prisma.ticket.update({ where: { id: ticket.id }, data: { status: "USED" } }),
-  ]);
+  const attendance = await prisma.attendance.create({
+    data: {
+      ticketId: ticket.id,
+      eventId: ticket.eventId,
+      scannedBy,
+      status: "PRESENT",
+      notes: "Entry allowed",
+    },
+  });
+
+  await prisma.ticket.update({
+    where: { id: ticket.id },
+    data: { status: "USED" },
+  });
 
   return {
     success: true,
     status: "PRESENT",
-    message: "Entry allowed — attendance marked successfully",
+    message: "Entry allowed",
     ticketId: ticket.id,
     eventId: ticket.eventId,
     attendeeName: ticket.user?.name,
-    seatNumber: ticket.seatNumber,
     scanTime: attendance.scanTime,
   };
 };
 
-// ── Read ─────────────────────────────────────────────────────────────
-
+// ─────────────────────────────────────────────
+// READ FUNCTIONS
+// ─────────────────────────────────────────────
 const getAttendanceById = async (id) => {
+  const prisma = getDB();
+
   const rec = await prisma.attendance.findUnique({
     where: { id },
-    include: { ticket: true, scannedByUser: { select: { id: true, name: true } } },
+    include: {
+      ticket: true,
+      scannedByUser: { select: { id: true, name: true } },
+    },
   });
-  if (!rec) throw { status: 404, message: "Attendance record not found" };
+
+  if (!rec) throw { status: 404, message: "Not found" };
   return rec;
 };
 
 const listConfirmedByEvent = async (eventId) => {
+  const prisma = getDB();
+
   return prisma.attendance.findMany({
     where: { eventId, status: "PRESENT" },
     include: {
-      ticket: { include: { user: { select: { id: true, name: true, email: true } } } },
+      ticket: {
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
     },
     orderBy: { scanTime: "asc" },
   });
 };
 
 const listAllScansByEvent = async (eventId) => {
+  const prisma = getDB();
+
   return prisma.attendance.findMany({
     where: { eventId },
-    include: { ticket: { select: { id: true, qrCode: true } } },
+    include: {
+      ticket: { select: { id: true, qrCode: true } },
+    },
     orderBy: { scanTime: "desc" },
   });
 };
 
 const getEventSummary = async (eventId) => {
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  const prisma = getDB();
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+  });
+
   if (!event) throw { status: 404, message: "Event not found" };
 
   const [total, present, duplicate, invalid] = await Promise.all([
@@ -168,34 +185,12 @@ const getEventSummary = async (eventId) => {
   };
 };
 
-// ── Update / Delete ───────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// USER ATTENDANCE
+// ─────────────────────────────────────────────
+const getAttendanceByUser = async (userId) => {
+  const prisma = getDB();
 
-const updateAttendanceNotes = async (id, notes) => {
-  return prisma.attendance.update({ where: { id }, data: { notes } });
-};
-
-const deleteAttendanceRecord = async (id) => {
-  const rec = await getAttendanceById(id);
-  // If deleting a PRESENT record, reset ticket back to ACTIVE
-  if (rec.status === "PRESENT" && rec.ticketId) {
-    await prisma.ticket.update({ where: { id: rec.ticketId }, data: { status: "ACTIVE" } });
-  }
-  await prisma.attendance.delete({ where: { id } });
-  return { message: `Attendance record ${id} deleted` };
-};
-
-module.exports = {
-  scanQrCode, getAttendanceById, listConfirmedByEvent,
-  listAllScansByEvent, getEventSummary, updateAttendanceNotes, deleteAttendanceRecord,
-  getAttendanceByUser,
-};
-
-/**
- * getAttendanceByUser — addition after the email 
- * Returns all events a user has attended (PRESENT scans only).
- * Used by GET /api/attendance/user/:userId
- */
-async function getAttendanceByUser(userId) {
   const records = await prisma.attendance.findMany({
     where: {
       status: "PRESENT",
@@ -217,9 +212,48 @@ async function getAttendanceByUser(userId) {
     totalEventsAttended: records.length,
     history: records.map((r) => ({
       attendanceId: r.id,
-      scanTime:     r.scanTime,
-      event:        r.event,
-      ticket:       r.ticket,
+      scanTime: r.scanTime,
+      event: r.event,
+      ticket: r.ticket,
     })),
   };
-}
+};
+
+// ─────────────────────────────────────────────
+// EXPORTS
+// ─────────────────────────────────────────────
+module.exports = {
+  scanQrCode,
+  getAttendanceById,
+  listConfirmedByEvent,
+  listAllScansByEvent,
+  getEventSummary,
+  updateAttendanceNotes: async (id, notes) => {
+    const prisma = getDB();
+    return prisma.attendance.update({
+      where: { id },
+      data: { notes },
+    });
+  },
+  deleteAttendanceRecord: async (id) => {
+    const prisma = getDB();
+
+    const rec = await prisma.attendance.findUnique({
+      where: { id },
+    });
+
+    if (rec?.status === "PRESENT" && rec.ticketId) {
+      await prisma.ticket.update({
+        where: { id: rec.ticketId },
+        data: { status: "ACTIVE" },
+      });
+    }
+
+    await prisma.attendance.delete({
+      where: { id },
+    });
+
+    return { message: "Deleted" };
+  },
+  getAttendanceByUser,
+};
