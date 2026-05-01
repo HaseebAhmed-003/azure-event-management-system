@@ -6,16 +6,19 @@ const KEY_VAULT_URL =
   "https://event-kv-iba.vault.azure.net/";
 
 const SECRET_MAP = {
-  "DB-HOST": "DB_HOST",
-  "DB-USER": "DB_USER",
-  "DB-NAME": "DB_NAME",
-  "DB-PASSWORD": "DB_PASSWORD",
+  "DB-HOST":               "DB_HOST",
+  "DB-USER":               "DB_USER",
+  "DB-NAME":               "DB_NAME",
+  "DB-PASSWORD":           "DB_PASSWORD",
 
-  "JWT-SECRET": "JWT_SECRET",
-  "JWT-EXPIRES-IN": "JWT_EXPIRES_IN",
-  "STRIPE-SECRET-KEY": "STRIPE_SECRET_KEY",
+  "JWT-SECRET":            "JWT_SECRET",
+  "JWT-EXPIRES-IN":        "JWT_EXPIRES_IN",
+
+  "STRIPE-SECRET-KEY":     "STRIPE_SECRET_KEY",
+
   "ACS-CONNECTION-STRING": "ACS_CONNECTION_STRING",
-  "EMAIL-FROM": "EMAIL_FROM",
+  "ACS-SENDER":            "ACS_SENDER",         // ← added (was missing before)
+  "EMAIL-FROM":            "EMAIL_FROM",
 };
 
 async function loadSecretsFromKeyVault() {
@@ -40,11 +43,11 @@ async function loadSecretsFromKeyVault() {
       loaded++;
       console.log(`✅ Loaded ${kvName}`);
     } else {
-      console.warn(`⚠️ Failed ${kvName}: ${result.reason?.message}`);
+      console.warn(`⚠️  Failed ${kvName}: ${result.reason?.message}`);
     }
   });
 
-  // BUILD DATABASE URL (NOW SAFE)
+  // Build DATABASE_URL from the 4 DB secrets
   if (
     process.env.DB_HOST &&
     process.env.DB_USER &&
@@ -58,16 +61,15 @@ async function loadSecretsFromKeyVault() {
 
     console.log("✅ DATABASE_URL built successfully");
   } else {
-    console.error("❌ DB secrets missing after Key Vault load");
-    console.log({
-      DB_HOST: process.env.DB_HOST,
-      DB_USER: process.env.DB_USER,
-      DB_NAME: process.env.DB_NAME,
-      DB_PASSWORD: process.env.DB_PASSWORD ? "SET" : "NOT SET",
+    console.error("❌ DB secrets missing after Key Vault load", {
+      DB_HOST:     process.env.DB_HOST     ? "SET" : "MISSING",
+      DB_USER:     process.env.DB_USER     ? "SET" : "MISSING",
+      DB_NAME:     process.env.DB_NAME     ? "SET" : "MISSING",
+      DB_PASSWORD: process.env.DB_PASSWORD ? "SET" : "MISSING",
     });
   }
 
-  console.log(`✅ Loaded ${loaded}/${entries.length} secrets`);
+  console.log(`✅ Loaded ${loaded}/${entries.length} secrets from Key Vault`);
 }
 
 module.exports = { loadSecretsFromKeyVault };

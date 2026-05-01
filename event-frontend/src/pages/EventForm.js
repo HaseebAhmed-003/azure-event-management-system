@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createEvent, updateEvent, getEvent, uploadBanner, publishEvent } from '../api';
@@ -24,12 +23,12 @@ export default function EventForm() {
       getEvent(id).then(r => {
         const ev = r.data;
         setForm({
-          title: ev.title || '',
-          description: ev.description || '',
-          venue: ev.venue || '',
+          title: ev.title ?? '',
+          description: ev.description ?? '',
+          venue: ev.venue ?? '',
           eventDate: ev.eventDate ? ev.eventDate.slice(0, 16) : '',
-          totalSeats: ev.totalSeats || '',
-          ticketPrice: ev.ticketPrice || '0',
+          totalSeats: ev.totalSeats ?? '',
+          ticketPrice: ev.ticketPrice !== undefined && ev.ticketPrice !== null ? String(ev.ticketPrice) : '0',
         });
         if (ev.bannerUrl) setBannerPreview(ev.bannerUrl);
         setLoading(false);
@@ -50,8 +49,8 @@ export default function EventForm() {
     if (!form.title.trim()) return 'Title is required.';
     if (!form.venue.trim()) return 'Venue is required.';
     if (!form.eventDate) return 'Event date is required.';
-    if (!form.totalSeats || parseInt(form.totalSeats) < 1) return 'Total seats must be at least 1.';
-    if (form.ticketPrice === '' || parseFloat(form.ticketPrice) < 0) return 'Ticket price cannot be negative.';
+    if (form.totalSeats === '' || parseInt(form.totalSeats, 10) < 1) return 'Total seats must be at least 1.';
+    if (form.ticketPrice === '' || Number(form.ticketPrice) < 0) return 'Ticket price cannot be negative.';
     return null;
   };
 
@@ -62,12 +61,15 @@ export default function EventForm() {
     setError('');
     setSaving(true);
     try {
+      const parsedPrice = form.ticketPrice === '' ? 0 : Number(form.ticketPrice);
+
       const payload = {
         ...form,
-        totalSeats: parseInt(form.totalSeats),
-        ticketPrice: parseFloat(form.ticketPrice) || 0,
-        isFree: parseFloat(form.ticketPrice) === 0,
+        totalSeats: parseInt(form.totalSeats, 10),
+        ticketPrice: parsedPrice,
+        isFree: parsedPrice === 0,
       };
+
       let ev;
       if (isEdit) {
         const res = await updateEvent(id, payload);
@@ -77,7 +79,6 @@ export default function EventForm() {
         ev = res.data;
       }
 
-      // Upload banner if selected
       if (banner) {
         try { await uploadBanner(ev.id, banner); } catch {}
       }

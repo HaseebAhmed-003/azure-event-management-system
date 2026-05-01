@@ -7,13 +7,6 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 
-// Routes
-const authRoutes = require("./routes/auth.routes");
-const eventRoutes = require("./routes/event.routes");
-const bookingRoutes = require("./routes/booking.routes");
-const paymentRoutes = require("./routes/payment.routes");
-const ticketRoutes = require("./routes/ticket.routes");
-const attendanceRoutes = require("./routes/attendance.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -78,13 +71,20 @@ async function startServer() {
 
     app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-    // 5. Routes
-    app.use("/api/auth", authRoutes);
-    app.use("/api/events", eventRoutes);
-    app.use("/api/bookings", bookingRoutes);
-    app.use("/api/payments", paymentRoutes);
-    app.use("/api/tickets", ticketRoutes);
-    app.use("/api/attendance", attendanceRoutes);
+    // 5. Routes — required AFTER vault so services load safely
+      const authRoutes = require("./routes/auth.routes");
+      const eventRoutes = require("./routes/event.routes");
+      const bookingRoutes = require("./routes/booking.routes");
+      const paymentRoutes = require("./routes/payment.routes");
+      const ticketRoutes = require("./routes/ticket.routes");
+      const attendanceRoutes = require("./routes/attendance.routes");
+
+        app.use("/api/auth", authRoutes);
+        app.use("/api/events", eventRoutes);
+        app.use("/api/bookings", bookingRoutes);
+        app.use("/api/payments", paymentRoutes);
+        app.use("/api/tickets", ticketRoutes);
+        app.use("/api/attendance", attendanceRoutes);
 
     // 6. Health
     app.get("/", (_req, res) => {

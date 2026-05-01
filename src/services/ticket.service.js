@@ -3,7 +3,6 @@ const { v4: uuidv4 } = require("uuid");
 const { getPrisma } = require("../lib/prisma");
 
 // FIX: prisma was missing (root cause of runtime crash)
-const prisma = getPrisma();
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -21,6 +20,7 @@ const qrToBase64 = async (data) => {
  * Creates one ticket per quantity unit in the booking.
  */
 const generateTicketsForBooking = async (booking) => {
+  const prisma = getPrisma();
   const tickets = [];
 
   const existingTicketCount = await prisma.ticket.count({
@@ -63,6 +63,7 @@ const generateTicketsForBooking = async (booking) => {
 };
 
 const getTicketById = async (id) => {
+  const prisma = getPrisma();
   const ticket = await prisma.ticket.findUnique({
     where: { id },
     include: {
@@ -82,6 +83,7 @@ const getTicketQRImage = async (id) => {
 };
 
 const listTicketsByUser = async (userId) => {
+  const prisma = getPrisma();
   return prisma.ticket.findMany({
     where: { userId },
     include: {
@@ -92,6 +94,7 @@ const listTicketsByUser = async (userId) => {
 };
 
 const listTicketsByEvent = async (eventId) => {
+  const prisma = getPrisma();
   return prisma.ticket.findMany({
     where: { eventId },
     include: {
@@ -102,14 +105,17 @@ const listTicketsByEvent = async (eventId) => {
 };
 
 const listTicketsByBooking = async (bookingId) => {
+  const prisma = getPrisma();
   return prisma.ticket.findMany({ where: { bookingId } });
 };
 
 const updateTicket = async (id, data) => {
+  const prisma = getPrisma();
   return prisma.ticket.update({ where: { id }, data });
 };
 
 const cancelTicket = async (id) => {
+  const prisma = getPrisma();
   const ticket = await getTicketById(id);
 
   if (ticket.status === "CANCELLED")

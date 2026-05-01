@@ -1,10 +1,10 @@
 const { getPrisma } = require("../lib/prisma");
 
 /** FIX: create single prisma instance (prevents "prisma is not defined") */
-const prisma = getPrisma();
 
 /** createBooking */
 const createBooking = async ({ eventId, quantity }, userId) => {
+  const prisma = getPrisma(); 
   const qty = Number(quantity);
 
   if (!Number.isInteger(qty) || qty < 1) {
@@ -60,6 +60,7 @@ const createBooking = async ({ eventId, quantity }, userId) => {
 
 /** getBookingById */
 const getBookingById = async (id) => {
+  const prisma = getPrisma(); 
   const booking = await prisma.booking.findUnique({
     where: { id },
     include: {
@@ -79,6 +80,7 @@ const getBookingById = async (id) => {
 
 /** listBookingsByUser */
 const listBookingsByUser = async (userId) => {
+  const prisma = getPrisma(); 
   return prisma.booking.findMany({
     where: { userId },
     include: {
@@ -98,6 +100,7 @@ const listBookingsByUser = async (userId) => {
 
 /** listBookingsByEvent */
 const listBookingsByEvent = async (eventId) => {
+  const prisma = getPrisma(); 
   return prisma.booking.findMany({
     where: { eventId },
     include: {
@@ -110,6 +113,7 @@ const listBookingsByEvent = async (eventId) => {
 
 /** listAllBookings */
 const listAllBookings = async ({ skip = 0, take = 100 } = {}) => {
+  const prisma = getPrisma(); 
   return prisma.booking.findMany({
     skip,
     take,
@@ -123,6 +127,7 @@ const listAllBookings = async ({ skip = 0, take = 100 } = {}) => {
 
 /** updateBookingStatus */
 const updateBookingStatus = async (id, status) => {
+  const prisma = getPrisma(); 
   return prisma.booking.update({
     where: { id },
     data: { status },
@@ -131,6 +136,7 @@ const updateBookingStatus = async (id, status) => {
 
 /** cancelBooking */
 const cancelBooking = async (id, userId) => {
+  const prisma = getPrisma(); 
   const booking = await getBookingById(id);
 
   if (booking.userId !== userId) {
@@ -164,6 +170,7 @@ const cancelBooking = async (id, userId) => {
 
 /** confirmBooking */
 const confirmBooking = async (id) => {
+  const prisma = getPrisma(); 
   return prisma.booking.update({
     where: { id },
     data: { status: "CONFIRMED" },
