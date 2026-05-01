@@ -1,4 +1,6 @@
+// src/services/event.service.js
 const { getPrisma } = require("../lib/prisma");
+const searchService = require("./search.service"); // ← NEW LINE
 
 /** =========================
  * CREATE EVENT
@@ -25,7 +27,7 @@ const createEvent = async (data, organizerId) => {
     throw { status: 400, message: "Invalid price" };
   }
 
-  return prisma.event.create({
+  const event = await prisma.event.create({
     data: {
       title: data.title,
       description: data.description || null,
@@ -39,6 +41,11 @@ const createEvent = async (data, organizerId) => {
       organizerId,
     },
   });
+
+  // Index in Azure AI Search (non-blocking)
+  searchService.indexEvent(event); // ← NEW LINE
+
+  return event;
 };
 
 /** =========================
@@ -57,11 +64,32 @@ const listEvents = async ({ skip = 0, take = 50 } = {}) => {
 
 /** =========================
  * SEARCH EVENTS (PUBLIC)
- * Supports: ?search= ?from= ?to= ?venue=
+ * Now powered by Azure AI Search
+ * Falls back to Prisma if AI Search is unavailable
  * ========================= */
-const searchEvents = async ({ search, from, to, venue, skip = 0, take = 50 } = {}) => {
-  const prisma = getPrisma();
+const searchEvents = async ({ search, from, to, venue, isFree, minPrice, maxPrice, skip = 0, take = 50 } = {}) => {
+  // Try Azure AI Search first
+  if (process.env.SEARCH_ENDPOINT && process.env.SEARCH_API_KEY) {
+    try {
+      const result = await searchService.searchEvents({
+        search,
+        from,
+        to,
+        venue,
+        isFree,
+        minPrice,
+        maxPrice,
+        skip,
+        take,
+      });
+      return result;
+    } catch (err) {
+      console.warn("[EVENT] AI Search failed, falling back to Prisma:", err.message);
+    }
+  }
 
+  // Fallback: original Prisma search
+  const prisma = getPrisma();
   const where = { status: "PUBLISHED" };
 
   if (search) {
@@ -81,12 +109,14 @@ const searchEvents = async ({ search, from, to, venue, skip = 0, take = 50 } = {
     if (to)   where.eventDate.lte = new Date(to);
   }
 
-  return prisma.event.findMany({
+  const results = await prisma.event.findMany({
     where,
     skip,
     take,
     orderBy: { eventDate: "asc" },
   });
+
+  return { total: results.length, results };
 };
 
 /** =========================
@@ -163,7 +193,6 @@ const getEventWithSeatStatus = async (id) => {
 
 /** =========================
  * GET EVENT DASHBOARD
- * Returns analytics for organizer view
  * ========================= */
 const getEventDashboard = async (eventId) => {
   const prisma = getPrisma();
@@ -232,10 +261,15 @@ const updateEvent = async (id, data, user) => {
     throw { status: 403, message: "Forbidden" };
   }
 
-  return prisma.event.update({
+  const updated = await prisma.event.update({
     where: { id: Number(id) },
     data,
   });
+
+  // Re-index with updated data
+  searchService.indexEvent(updated); // ← NEW LINE
+
+  return updated;
 };
 
 /** =========================
@@ -254,10 +288,15 @@ const publishEvent = async (id, user) => {
     throw { status: 400, message: "Event must have title, venue and date before publishing" };
   }
 
-  return prisma.event.update({
+  const published = await prisma.event.update({
     where: { id: Number(id) },
     data: { status: "PUBLISHED" },
   });
+
+  // Index published event so it becomes searchable immediately
+  searchService.indexEvent(published); // ← NEW LINE
+
+  return published;
 };
 
 /** =========================
@@ -272,15 +311,18 @@ const setBanner = async (id, bannerUrl, user) => {
     throw { status: 403, message: "Forbidden" };
   }
 
-  return prisma.event.update({
+  const updated = await prisma.event.update({
     where: { id: Number(id) },
     data: { bannerUrl },
   });
+
+  searchService.indexEvent(updated); // ← NEW LINE
+
+  return updated;
 };
 
 /** =========================
  * DELETE EVENT
- * Only allowed if no confirmed bookings exist
  * ========================= */
 const deleteEvent = async (id, user) => {
   const prisma = getPrisma();
@@ -302,7 +344,6 @@ const deleteEvent = async (id, user) => {
     };
   }
 
-  // Delete in dependency order
   await prisma.attendance.deleteMany({ where: { eventId: Number(id) } });
   await prisma.ticket.deleteMany({ where: { eventId: Number(id) } });
   await prisma.payment.deleteMany({
@@ -310,6 +351,9 @@ const deleteEvent = async (id, user) => {
   });
   await prisma.booking.deleteMany({ where: { eventId: Number(id) } });
   await prisma.event.delete({ where: { id: Number(id) } });
+
+  // Remove from search index
+  searchService.removeEventFromIndex(id); // ← NEW LINE
 
   return { message: `Event ${id} deleted` };
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getEvents } from '../api';
@@ -35,7 +34,16 @@ export default function Events() {
       if (to) params.to = to;
       const res = await getEvents(params);
       const data = res.data;
-      setEvents(Array.isArray(data) ? data : (data.events || []));
+
+      // UPDATED HANDLING
+      if (Array.isArray(data)) {
+        setEvents(data);
+      } else if (data.results) {
+        setEvents(data.results);
+      } else {
+        setEvents([]);
+      }
+
     } catch {
       setEvents([]);
     } finally {

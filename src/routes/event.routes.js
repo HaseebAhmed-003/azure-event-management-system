@@ -20,16 +20,20 @@ router.get("/", async (req, res) => {
     const take = Number(req.query.take) || 50;
 
     if (search || from || to || venue) {
-      const result = await eventService.searchEvents({
-        search,
-        from,
-        to,
-        venue,
-        skip,
-        take,
-      });
-      return res.json(result);
-    }
+  const result = await eventService.searchEvents({
+    search,
+    from,
+    to,
+    venue,
+    isFree:   req.query.isFree,
+    minPrice: req.query.minPrice,
+    maxPrice: req.query.maxPrice,
+    skip,
+    take,
+  });
+  // result is { total, results } from AI Search OR plain array from fallback
+  return res.json(result);
+}
 
     const events = await eventService.listEvents({ skip, take });
     res.json(events);

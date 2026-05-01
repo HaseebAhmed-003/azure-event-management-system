@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const { loadSecretsFromKeyVault } = require("./lib/keyvault");
+const { ensureIndexExists } = require("./lib/search"); // ← ADD THIS
 const appInsights = require("applicationinsights");
 
 const express = require("express");
@@ -17,6 +18,11 @@ async function startServer() {
 
     // 1. LOAD KEY VAULT FIRST (CRITICAL)
     await loadSecretsFromKeyVault();
+
+    // ← ADD THIS BLOCK right after the Key Vault call:
+    console.log("🔍 Bootstrapping Azure AI Search index...");
+    await ensureIndexExists();
+    // ← END ADD
 
     // 2. BUILD DATABASE URL AFTER VAULT LOADS
     if (

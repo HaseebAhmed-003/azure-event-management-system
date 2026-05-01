@@ -17,8 +17,10 @@ const SECRET_MAP = {
   "STRIPE-SECRET-KEY":     "STRIPE_SECRET_KEY",
 
   "ACS-CONNECTION-STRING": "ACS_CONNECTION_STRING",
-  "ACS-SENDER":            "ACS_SENDER",         // ← added (was missing before)
   "EMAIL-FROM":            "EMAIL_FROM",
+
+  "SEARCH-ENDPOINT":       "SEARCH_ENDPOINT",   // ← ADD THIS
+  "SEARCH-API-KEY":        "SEARCH_API_KEY",     // ← ADD THIS
 };
 
 async function loadSecretsFromKeyVault() {
