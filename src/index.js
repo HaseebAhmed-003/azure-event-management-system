@@ -1,6 +1,20 @@
 
 
 require("dotenv").config();
+
+// Azure Application Insights — must be initialized before anything else
+const appInsights = require('applicationinsights');
+if (process.env.APPLICATIONINSIGHTS_CONNECTION_STRING) {
+  appInsights
+    .setup(process.env.APPLICATIONINSIGHTS_CONNECTION_STRING)
+    .setAutoCollectRequests(true)
+    .setAutoCollectExceptions(true)
+    .setAutoCollectDependencies(true)
+    .setAutoCollectPerformance(true)
+    .start();
+  console.log('✅ Application Insights connected');
+}
+
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -17,7 +31,13 @@ const PORT = process.env.PORT || 3000;
 
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    "http://20.174.16.183:3001",
+    "http://localhost:3001"
+  ],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

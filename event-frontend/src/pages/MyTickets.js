@@ -88,7 +88,7 @@ export default function MyTickets() {
                         View QR
                       </button>
                       <a
-                        href={`http://localhost:3000/api/tickets/${t.id}/qr/download`}
+                        href={`http://20.174.16.183:3000/api/tickets/${t.id}/qr/download`}
                         className="btn btn-secondary btn-sm"
                         download
                         target="_blank"

@@ -66,7 +66,7 @@ cp .env.example .env
 | JWT_SECRET | Secret key for signing JWT tokens | a-long-random-secret-string |
 | JWT_EXPIRES_IN | Token lifetime | 7d |
 | PORT | Express server port | 3000 |
-| APP_BASE_URL | Base URL for redirect and email links | http://localhost:3000 |
+| APP_BASE_URL | Base URL for redirect and email links | http://20.174.16.183:3000 |
 | SMTP_HOST | SMTP server host (optional) | smtp.gmail.com |
 | SMTP_PORT | SMTP port (optional) | 587 |
 | SMTP_USER | SMTP login email (optional) | your_email@gmail.com |
@@ -112,7 +112,7 @@ npm run dev
 npm start
 ```
 
-The server starts at **http://localhost:3000**
+The server starts at **http://20.174.16.183:3000**
 
 A root endpoint `GET /` lists all route prefixes. A health check is available at `GET /health`.
 
@@ -187,7 +187,7 @@ Six Prisma models map to PostgreSQL tables. All foreign keys are enforced at the
 
 ## 9. API Endpoints
 
-All endpoints are prefixed with `http://localhost:3000`. Protected routes require the header:
+All endpoints are prefixed with `http://20.174.16.183:3000`. Protected routes require the header:
 `Authorization: Bearer YOUR_JWT_TOKEN`
 
 ---
@@ -504,7 +504,11 @@ Upload a banner image for an event. Send as `multipart/form-data`.
 {
   "id": 1,
   "title": "Tech Conference Karachi",
+<<<<<<< HEAD
   "bannerUrl": "http://localhost:3000/uploads/banners/1735000000000-123456789.jpg"
+=======
+  "bannerUrl": "http://20.174.16.183:3000/uploads/banners/1735000000000-123456789.jpg"
+>>>>>>> e704f47 (Initial commit)
 }
 ```
 
@@ -1166,7 +1170,11 @@ Open .env and fill in your values:
 | JWT_SECRET | Secret key for JWT tokens | any-long-random-string |
 | JWT_EXPIRES_IN | Token lifetime | 7d |
 | PORT | Backend server port | 3000 |
+<<<<<<< HEAD
 | APP_BASE_URL | Base URL for links | http://localhost:3000 |
+=======
+| APP_BASE_URL | Base URL for links | http://20.174.16.183:3000 |
+>>>>>>> e704f47 (Initial commit)
 | SMTP_HOST | SMTP host (optional) | smtp.gmail.com |
 | SMTP_PORT | SMTP port (optional) | 587 |
 | SMTP_USER | SMTP email (optional) | your@gmail.com |
@@ -1209,7 +1217,11 @@ This creates three test accounts:
 bash
 npm start
 
+<<<<<<< HEAD
 Backend runs at *http://localhost:3000*
+=======
+Backend runs at *http://20.174.16.183:3000*
+>>>>>>> e704f47 (Initial commit)
 
 ---
 
