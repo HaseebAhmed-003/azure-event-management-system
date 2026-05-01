@@ -32,19 +32,22 @@ API.interceptors.response.use(
  * AUTH
  * ======================== */
 export const register = (d) => API.post("/auth/register", d);
-export const login = (d) => API.post("/auth/login", d);
-export const getMe = () => API.get("/auth/me");
+export const login    = (d) => API.post("/auth/login", d);
+export const getMe    = ()  => API.get("/auth/me");
 
 /** ========================
  * EVENTS
+ * BUG FIX: getEvents now accepts and passes params as query string
+ * Before: getEvents = () => API.get("/events")         ← params ignored!
+ * After:  getEvents = (params) => API.get("/events", { params })
  * ======================== */
-export const getEvents = () => API.get("/events");
-export const getEvent = (id) => API.get(`/events/${id}`);
-export const getMyEvents = () => API.get("/events/my");
-export const createEvent = (d) => API.post("/events", d);
-export const updateEvent = (id, d) => API.put(`/events/${id}`, d);
-export const publishEvent = (id) => API.post(`/events/${id}/publish`);
-export const deleteEvent = (id) => API.delete(`/events/${id}`);
+export const getEvents      = (params = {}) => API.get("/events", { params });
+export const getEvent       = (id)          => API.get(`/events/${id}`);
+export const getMyEvents    = ()            => API.get("/events/my");
+export const createEvent    = (d)           => API.post("/events", d);
+export const updateEvent    = (id, d)       => API.put(`/events/${id}`, d);
+export const publishEvent   = (id)          => API.post(`/events/${id}/publish`);
+export const deleteEvent    = (id)          => API.delete(`/events/${id}`);
 
 export const uploadBanner = (id, file) => {
   const fd = new FormData();
@@ -52,14 +55,13 @@ export const uploadBanner = (id, file) => {
   return API.post(`/events/${id}/banner`, fd);
 };
 
-export const getEventDashboard = (id) =>
-  API.get(`/events/${id}/dashboard`);
+export const getEventDashboard = (id) => API.get(`/events/${id}/dashboard`);
 
 /** ========================
  * BOOKINGS
  * ======================== */
-export const createBooking = (d) => API.post("/bookings", d);
-export const getMyBookings = () => API.get("/bookings/my");
+export const createBooking = (d)  => API.post("/bookings", d);
+export const getMyBookings = ()   => API.get("/bookings/my");
 export const cancelBooking = (id) => API.delete(`/bookings/${id}`);
 
 /** ========================
@@ -71,9 +73,9 @@ export const simulatePayment = (id, success) =>
 /** ========================
  * TICKETS
  * ======================== */
-export const getMyTickets = () => API.get("/tickets/my");
-export const getTicketQR = (id) => API.get(`/tickets/${id}/qr`);
-export const cancelTicket = (id) => API.delete(`/tickets/${id}`);
+export const getMyTickets  = ()   => API.get("/tickets/my");
+export const getTicketQR   = (id) => API.get(`/tickets/${id}/qr`);
+export const cancelTicket  = (id) => API.delete(`/tickets/${id}`);
 
 /** ========================
  * ATTENDANCE

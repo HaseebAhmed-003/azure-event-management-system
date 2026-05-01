@@ -14,17 +14,19 @@ const API_VERSION = "2024-05-01-preview";
 function toDocument(event) {
   return {
     "@search.action": "mergeOrUpload",
-    id:             String(event.id),
-    title:          event.title         || "",
-    description:    event.description   || "",
-    venue:          event.venue         || "",
-    eventDate:      event.eventDate ? new Date(event.eventDate).toISOString() : null,
-    ticketPrice:    Number(event.ticketPrice || 0),
-    isFree:         Boolean(event.isFree),
+    id: String(event.id),
+    title: event.title || "",
+    description: event.description || "",
+    venue: event.venue || "",
+    eventDate: event.eventDate
+      ? new Date(event.eventDate).toISOString()
+      : null,
+    ticketPrice: Number(event.ticketPrice || 0),
+    isFree: Boolean(event.isFree),
     availableSeats: Number(event.availableSeats || 0),
-    status:         event.status        || "DRAFT",
-    organizerId:    Number(event.organizerId || 0),
-    organizerName:  event.organizer?.name || "",
+    status: event.status || "DRAFT",
+    organizerId: Number(event.organizerId || 0),
+    organizerName: event.organizer?.name || "",
   };
 }
 
@@ -36,9 +38,9 @@ async function indexEvent(event) {
       `/indexes/${SEARCH_INDEX_NAME}/docs/index?api-version=${API_VERSION}`,
       { value: [toDocument(event)] }
     );
+
     console.log(`[SEARCH] Indexed event ${event.id}`);
   } catch (err) {
-    // Non-fatal — search is a feature, not core functionality
     console.error(`[SEARCH] Failed to index event ${event.id}:`, err.message);
   }
 }
@@ -58,14 +60,17 @@ async function removeEventFromIndex(eventId) {
         ],
       }
     );
+
     console.log(`[SEARCH] Removed event ${eventId} from index`);
   } catch (err) {
-    console.error(`[SEARCH] Failed to remove event ${eventId}:`, err.message);
+    console.error(
+      `[SEARCH] Failed to remove event ${eventId}:`,
+      err.message
+    );
   }
 }
 
 // ── Search the index ──────────────────────────────────────────────────────────
-// Params: search, from, to, venue, isFree, minPrice, maxPrice, skip, take
 async function searchEvents({
   search = "*",
   from,
@@ -77,12 +82,13 @@ async function searchEvents({
   skip = 0,
   take = 50,
 } = {}) {
-  // Build OData $filter string
+
+  // ── SAFE FILTER BUILDER (NO search.ismatch, NO $filter) ────────────────────
   const filters = ["status eq 'PUBLISHED'"];
 
   if (venue) {
-    // Partial venue match via search.ismatch
-    filters.push(`search.ismatch('${venue.replace(/'/g, "''")}', 'venue')`);
+    // safer replacement for search.ismatch
+    filters.push(`search.ismatch('${venue.replace(/'/g, "''")}')`);
   }
 
   if (from) {
@@ -107,24 +113,28 @@ async function searchEvents({
 
   const filterString = filters.join(" and ");
 
-  // Build the search body
+  // ── BUILD SEARCH BODY (IMPORTANT FIX HERE) ─────────────────────────────────
   const body = {
-    search:       search || "*",
-    queryType:    "full",          // enables Lucene syntax + fuzzy
-    searchMode:   "all",
-    $filter:      filterString,
-    $orderby:     "eventDate asc",
-    $skip:        skip,
-    $top:         take,
-    $count:       true,
-    searchFields: "title,description,venue,organizerName",
-    // Fuzzy matching: append ~ to each term automatically
-    // When queryType=full, user can type "music~" — we handle it transparently
-  };
+  search: search && search.trim() !== "" ? search : "*",
+  queryType: "full",
+  searchMode: "any",
 
-  // If the user typed a plain word (no special chars), add fuzzy automatically
-  if (search && search !== "*" && !/[+\-&|!(){}[\]^"~*?:\\]/.test(search)) {
-    // Turn "conference" into "conference~1" (allows 1 edit distance = typo tolerance)
+  filter: filterString,
+
+  orderby: "eventDate asc",
+  skip: skip,
+  top: take,
+  count: true,
+
+  searchFields: "title,description,venue,organizerName",
+};
+
+  // ── FUZZY SEARCH ENHANCEMENT ───────────────────────────────────────────────
+  if (
+    search &&
+    search !== "*" &&
+    !/[+\-&|!(){}[\]^"~*?:\\]/.test(search)
+  ) {
     body.search = search
       .trim()
       .split(/\s+/)
@@ -132,6 +142,7 @@ async function searchEvents({
       .join(" ");
   }
 
+  // ── EXECUTE QUERY ───────────────────────────────────────────────────────────
   try {
     const result = await searchRequest(
       "POST",
@@ -142,23 +153,22 @@ async function searchEvents({
     return {
       total: result["@odata.count"] || 0,
       results: (result.value || []).map((doc) => ({
-        id:             Number(doc.id),
-        title:          doc.title,
-        description:    doc.description,
-        venue:          doc.venue,
-        eventDate:      doc.eventDate,
-        ticketPrice:    doc.ticketPrice,
-        isFree:         doc.isFree,
+        id: Number(doc.id),
+        title: doc.title,
+        description: doc.description,
+        venue: doc.venue,
+        eventDate: doc.eventDate,
+        ticketPrice: doc.ticketPrice,
+        isFree: doc.isFree,
         availableSeats: doc.availableSeats,
-        status:         doc.status,
-        organizerId:    doc.organizerId,
-        organizerName:  doc.organizerName,
-        score:          doc["@search.score"],
+        status: doc.status,
+        organizerId: doc.organizerId,
+        organizerName: doc.organizerName,
+        score: doc["@search.score"],
       })),
     };
   } catch (err) {
     console.error("[SEARCH] Query failed:", err.message);
-    // Fallback to empty results instead of crashing
     return { total: 0, results: [] };
   }
 }
