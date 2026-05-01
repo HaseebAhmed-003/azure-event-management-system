@@ -1,168 +1,381 @@
-# Event Ticketing System — Backend API
+# EventHub — Azure Event Management & QR Attendance System
+
+A full-stack event management platform deployed entirely on **Microsoft Azure**. Organisers create and publish events, attendees book and pay for tickets, venue staff scan QR codes for real-time attendance, and Azure Logic Apps automatically notify attendees when an event is cancelled.
 
 ---
 
-## 1. Project Overview
+## Azure Infrastructure
 
-This is the backend for an Event Ticketing System built for Milestone 3 of the Web-Based Application Development course. The system supports three fully implemented backend workflows:
+| Resource | Type | Purpose |
+|---|---|---|
+| `TestIBA` | Virtual Machine (Windows) | Hosts the Node.js backend (port 3000) and React frontend (port 3001) |
+| `testiba-ip` | Public IP | Static IP `20.174.16.183` — entry point for all traffic |
+| `event-kv-iba` | Key Vault | Stores all secrets — DB password, JWT, Stripe, ACS connection strings |
+| `event-pg-server` | PostgreSQL Flexible Server | Primary database — `event_system_db` |
+| `event-comms` | Communication Service | Azure Communication Services — email dispatch hub |
+| `event-email-service` | Email Communication Service | ACS verified sender domain for outbound email |
+| `event-search-iba` | AI Search | Full-text event search with filters (venue, date, price) |
+| `event-insights` | Application Insights | Live telemetry — HTTP requests, exceptions, dependencies |
+| `ibab2cf` | Storage Account | File storage for banner images and uploads |
+| `event-cancel-notify` | Logic App (Consumption) | Automated attendee notification on event cancellation |
+| `IBA` | Resource Group | Container for all resources above |
 
-| Workflow | Description |
-|----------|-------------|
-| WF1 — User Ticket Booking | Event browsing with search and filters, seat reservation with availability check, simulated payment toggle, QR ticket generation, and automated email confirmation. |
-| WF2 — Organizer Event Creation | Organizer-only dashboard, event form with server-side validation, image/banner upload, seat capacity control, and one-click publish to the public catalogue. |
-| WF3 — QR Scanning and Attendance | QR code scan pipeline with duplicate fraud prevention, real-time attendance summary, and per-user attendance history. |
-
----
-
-## 2. Technology Stack
-
-| Layer | Technology | Version / Notes |
-|-------|------------|-----------------|
-| Runtime | Node.js | 18 or higher |
-| Framework | Express.js | 4.19 |
-| Database | PostgreSQL | 14 or higher |
-| ORM | Prisma | 5.13 |
-| Auth | jsonwebtoken + bcryptjs | 9.0 / 2.4 |
-| QR Codes | qrcode | 1.5 |
-| Email | Nodemailer | 6.9 — SMTP-based HTML email |
-| Payments | Stripe + simulated toggle endpoint | 15.7 |
-| File Upload | Multer | 1.4 — images up to 5 MB |
+**Region:** UAE North · **Subscription:** Azure for Students
 
 ---
 
-## 3. Prerequisites
+## Architecture Overview
 
-- Node.js v18 or higher — https://nodejs.org
-- PostgreSQL 14 or higher running locally or on a remote host
-- npm (bundled with Node.js)
-- A Gmail account or any SMTP provider — optional; email is skipped gracefully when not configured
-- A Stripe account — optional; the simulated payment endpoint works without Stripe credentials
+```
+Browser (React :3001)
+        │
+        ▼
+Azure VM — TestIBA (20.174.16.183)
+   ├── Backend: Node.js / Express  :3000
+   │      ├── src/lib/keyvault.js        → loads all secrets at startup from Key Vault
+   │      ├── src/lib/prisma.js          → lazy Prisma client (initialised after vault)
+   │      ├── src/lib/search.js          → Azure AI Search client
+   │      ├── src/services/              → business logic per domain
+   │      ├── src/routes/                → REST API endpoints
+   │      └── src/middleware/            → JWT auth, file upload
+   │
+   ├── Azure Key Vault      ← secrets injected into process.env on startup
+   ├── PostgreSQL           ← Prisma ORM
+   ├── Azure AI Search      ← full-text search index for events
+   ├── Azure ACS Email      ← booking confirmation emails with PDF + QR attachment
+   ├── Azure Logic Apps     ← event cancellation notification workflow
+   └── App Insights         ← live telemetry and error tracking
 
----
-
-## 4. Installation and Setup
-
-### Step 1 — Clone the Repository
-```bash
-git clone https://github.com/haseebahmed003/azure-event-management-system.git
-cd azure-event-management-system
+Azure Function (eventReport/)
+   └── Timer trigger: 06:00 UTC daily — PDF attendance report emailed to organisers
 ```
 
-### Step 2 — Install Dependencies
+### Critical Startup Sequence
+
+```
+node src/index.js
+  └── loadSecretsFromKeyVault()        ← MUST run first (Managed Identity)
+        └── ensureIndexExists()        ← bootstraps AI Search index if missing
+              └── DATABASE_URL built
+                    └── Routes loaded  ← Prisma safe to use here
+                          └── app.listen(:3000)
+```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Node.js 18+ |
+| Framework | Express.js 4.19 |
+| Database | Azure PostgreSQL Flexible Server via Prisma ORM 5.13 |
+| Auth | jsonwebtoken + bcryptjs |
+| Secrets | `@azure/keyvault-secrets` + `@azure/identity` (DefaultAzureCredential) |
+| Search | `@azure/search-documents` (Azure AI Search) |
+| Email | `@azure/communication-email` (ACS) |
+| Payments | Stripe 15.7 + simulated payment toggle |
+| QR / PDF | qrcode + pdfkit |
+| File Upload | Multer (5 MB, JPEG/PNG/WEBP/GIF) |
+| Monitoring | `applicationinsights` (Azure Monitor) |
+| Automation | Azure Logic Apps (Consumption) — HTTP trigger + Foreach loop |
+| Frontend | React (Create React App) + React Router + Axios |
+
+---
+
+## Project Structure
+
+```
+├── src/
+│   ├── index.js                         # Entry — vault → search bootstrap → listen
+│   ├── lib/
+│   │   ├── keyvault.js                  # DefaultAzureCredential secret loader
+│   │   ├── prisma.js                    # Lazy PrismaClient singleton
+│   │   └── search.js                   # Azure AI Search index bootstrap
+│   ├── middleware/
+│   │   ├── auth.middleware.js           # JWT verify, requireOrganizer, requireAdmin
+│   │   └── upload.middleware.js         # Multer — banner images
+│   ├── routes/
+│   │   ├── auth.routes.js               # /api/auth
+│   │   ├── event.routes.js              # /api/events  (+ cancel + internal notify)
+│   │   ├── booking.routes.js            # /api/bookings
+│   │   ├── payment.routes.js            # /api/payments
+│   │   ├── ticket.routes.js             # /api/tickets
+│   │   └── attendance.routes.js         # /api/attendance
+│   └── services/
+│       ├── auth.service.js
+│       ├── event.service.js             # cancelEvent fires Logic App trigger
+│       ├── booking.service.js
+│       ├── payment.service.js
+│       ├── ticket.service.js
+│       ├── attendance.service.js
+│       ├── search.service.js            # Azure AI Search index + query
+│       ├── email.service.js             # ACS — booking confirmation + cancellation email
+│       └── logicapp.service.js          # HTTP trigger caller for Logic App
+├── eventReport/
+│   ├── index.js                         # Azure Timer Function — daily PDF reports
+│   └── function.json                    # Cron: 0 0 6 * * * (06:00 UTC)
+├── logic-app/
+│   └── cancellation-logic-app-arm.json  # ARM template — deploys event-cancel-notify
+├── scripts/
+│   └── seedSearch.js                    # Seeds existing events into AI Search index
+├── prisma/
+│   ├── schema.prisma
+│   ├── seed.js
+│   └── migrations/
+├── event-frontend/
+│   └── src/
+│       ├── api.js                       # Axios client + all API call exports
+│       ├── AuthContext.js               # Global JWT auth state
+│       ├── App.js                       # React Router — all 12 routes
+│       ├── index.css                    # Dark-theme design system
+│       ├── components/
+│       │   ├── Navbar.js                # Role-aware navigation
+│       │   ├── ProtectedRoute.js        # Auth + role guard
+│       │   └── NotFound.js
+│       └── pages/
+│           ├── Home.js                  # Landing page + upcoming events
+│           ├── Events.js                # Browse + search events (AI Search powered)
+│           ├── EventDetail.js           # Detail page + booking form
+│           ├── Login.js / Register.js
+│           ├── MyBookings.js            # Attendee bookings + payment simulation
+│           ├── MyTickets.js             # QR ticket viewer
+│           ├── OrganizerEvents.js       # Organiser dashboard (publish / cancel / delete)
+│           ├── EventForm.js             # Create / edit event
+│           ├── OrganizerDashboard.js    # Per-event analytics
+│           └── QRScanner.js            # Live QR scanner for venue staff
+├── .env.example
+└── package.json
+```
+
+---
+
+## Azure Key Vault Secrets
+
+All secrets live in `event-kv-iba` and are loaded automatically at startup via `DefaultAzureCredential` (VM Managed Identity — no credentials in code or `.env`).
+
+| Key Vault Secret Name | Environment Variable | Description |
+|---|---|---|
+| `DB-PASSWORD` | `DB_PASSWORD` | PostgreSQL password |
+| `JWT-SECRET` | `JWT_SECRET` | JWT signing secret |
+| `JWT-EXPIRES-IN` | `JWT_EXPIRES_IN` | Token expiry (e.g. `7d`) |
+| `STRIPE-SECRET-KEY` | `STRIPE_SECRET_KEY` | Stripe secret key |
+| `ACS-CONNECTION-STRING` | `ACS_CONNECTION_STRING` | Azure Communication Services connection string |
+| `EMAIL-FROM` | `EMAIL_FROM` | Verified ACS sender address |
+| `SEARCH-ENDPOINT` | `SEARCH_ENDPOINT` | Azure AI Search endpoint URL |
+| `SEARCH-API-KEY` | `SEARCH_API_KEY` | Azure AI Search admin key |
+
+After loading, `keyvault.js` automatically constructs:
+```
+DATABASE_URL = postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:5432/{DB_NAME}?sslmode=require
+```
+
+---
+
+## Non-Secret Environment Variables (`.env` on VM)
+
+```env
+PORT=3000
+APP_BASE_URL=http://20.174.16.183:3000
+FRONTEND_URL=http://20.174.16.183:3001
+KEY_VAULT_URL=https://event-kv-iba.vault.azure.net/
+DB_HOST=event-pg-server.postgres.database.azure.com
+DB_USER=pgadmin
+DB_NAME=event_system_db
+UPLOAD_DIR=uploads
+APPLICATIONINSIGHTS_CONNECTION_STRING=<from App Insights portal>
+
+# Logic Apps — Event Cancellation Notification
+LOGIC_APP_CANCEL_URL=<HTTP POST URL from Logic App trigger blade in Azure portal>
+LOGIC_APP_SECRET=<shared secret string — must match X-Logic-App-Secret header in Logic App>
+```
+
+---
+
+## Setup & Deployment (Azure VM)
+
+### Step 1 — Connect to the VM via RDP
+1. Azure Portal → **Virtual machines** → **TestIBA** → **Connect** → **RDP**
+2. Download the `.rdp` file and open it
+3. Enter your VM credentials
+
+### Step 2 — Install and Run Backend
 ```bash
 npm install
+cp .env.example .env        # fill in non-secret values only
+npx prisma migrate deploy   # applies migrations against Azure PostgreSQL
+npm start                   # loads Key Vault → bootstraps Search → starts on port 3000
 ```
 
-### Step 3 — Configure Environment Variables
-
-Copy the example file and edit the values for your local environment:
+### Step 3 — Seed the AI Search Index
 ```bash
-cp .env.example .env
+node scripts/seedSearch.js  # indexes existing events into Azure AI Search
 ```
 
-| Variable | Description | Example Value |
-|----------|-------------|---------------|
-| DATABASE_URL | PostgreSQL connection string | postgresql://postgres:password@localhost:5432/event_system_db |
-| JWT_SECRET | Secret key for signing JWT tokens | a-long-random-secret-string |
-| JWT_EXPIRES_IN | Token lifetime | 7d |
-| PORT | Express server port | 3000 |
-| APP_BASE_URL | Base URL for redirect and email links | http://20.174.16.183:3000 |
-| SMTP_HOST | SMTP server host (optional) | smtp.gmail.com |
-| SMTP_PORT | SMTP port (optional) | 587 |
-| SMTP_USER | SMTP login email (optional) | your_email@gmail.com |
-| SMTP_PASS | SMTP app password (optional) | your_app_password |
-| EMAIL_FROM | Sender address for confirmation emails | your_email@gmail.com |
-| STRIPE_SECRET_KEY | Stripe secret key (optional) | sk_test_... |
-| STRIPE_WEBHOOK_SECRET | Stripe webhook signing secret (optional) | whsec_... |
-| UPLOAD_DIR | Folder for uploaded banner images | uploads |
-
-> SMTP and Stripe keys are optional for local testing. Email sending is skipped gracefully when SMTP_USER/SMTP_PASS are absent. The simulated payment endpoint confirms bookings without any Stripe credentials.
-
-### Step 4 — Create the Database and Run Migrations
+### Step 4 — Build and Serve Frontend
 ```bash
-# Create the PostgreSQL database:
-createdb event_system_db
-
-# Apply Prisma migrations (creates all tables):
-npx prisma migrate dev --name init
-
-# Alternative — push schema without migration history:
-npx prisma db push
+cd event-frontend
+npm install
+npm run build
+serve -s build -l 3001
 ```
 
-### Step 5 — Seed Test Data
+### Step 5 — Set Up the Logic App
+1. Azure Portal → **Logic Apps** → **+ Create**
+   - Name: `event-cancel-notify` · Region: UAE North · Plan: Consumption
+2. **Logic App Designer** → trigger: "When a HTTP request is received"
+3. Paste the request body JSON schema (see `logic-app/cancellation-logic-app-arm.json`)
+4. Add **For each** loop over `attendees`
+5. Inside loop → **HTTP** action → `POST http://20.174.16.183:3000/api/events/internal/notify-cancellation`
+6. Headers: `Content-Type: application/json`, `X-Logic-App-Secret: <your-secret>`
+7. Copy the trigger HTTP POST URL → paste into `LOGIC_APP_CANCEL_URL` in `.env`
+8. Restart the backend
 
-The seed script creates three test accounts (one per role) and one sample published event:
+> **ARM template alternative:** Deploy `logic-app/cancellation-logic-app-arm.json` via Azure Portal → "Deploy a custom template" for one-click setup.
+
+### First-Time Database Setup
 ```bash
-npm run db:seed
+npx prisma migrate dev --name init   # development
+npx prisma migrate deploy            # production (VM)
+npm run db:seed                      # optional — creates 3 test accounts + 1 sample event
 ```
 
+### Test Accounts (after seeding)
 | Role | Email | Password |
 |------|-------|----------|
 | ADMIN | admin@eventsystem.com | admin123 |
 | ORGANIZER | organizer@eventsystem.com | organizer123 |
 | ATTENDEE | attendee@eventsystem.com | attendee123 |
 
-### Step 6 — Start the Server
-```bash
-# Development (auto-restart on save):
-npm run dev
+---
 
-# Production:
-npm start
-```
+## API Reference
 
-The server starts at **http://20.174.16.183:3000**
+All endpoints are prefixed with `http://20.174.16.183:3000`. Protected routes require:
+`Authorization: Bearer <JWT>`
 
-A root endpoint `GET /` lists all route prefixes. A health check is available at `GET /health`.
+### Auth — `/api/auth`
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/register` | — | Register (role: ATTENDEE or ORGANIZER) |
+| POST | `/login` | — | Login, returns JWT |
+| GET | `/me` | ✓ | Current user profile |
+| GET | `/users` | Admin | List all users |
+| PUT | `/users/:id` | ✓ | Update profile |
+| DELETE | `/users/:id` | Admin | Delete user |
+
+### Events — `/api/events`
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/` | — | List published events (AI Search powered — `?search=&from=&to=&venue=&isFree=&minPrice=&maxPrice=`) |
+| GET | `/my` | Organizer | Organiser's own events |
+| GET | `/admin/all` | Admin | All events (all statuses) |
+| GET | `/:id` | — | Event detail + seat availability |
+| GET | `/:id/dashboard` | Organizer | Event analytics |
+| POST | `/` | Organizer | Create event (status: DRAFT) |
+| POST | `/:id/publish` | Organizer | Publish event |
+| POST | `/:id/cancel` | Organizer | **Cancel event + trigger Logic App → notify all attendees** |
+| POST | `/:id/banner` | Organizer | Upload banner image |
+| PUT | `/:id` | Organizer | Update event |
+| DELETE | `/:id` | Organizer | Hard-delete (DRAFT only, no confirmed bookings) |
+| POST | `/internal/notify-cancellation` | Logic App secret | Internal — ACS sends one cancellation email per call |
+
+### Bookings — `/api/bookings`
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/` | ✓ | Create booking (reserves seats, status: PENDING) |
+| GET | `/my` | ✓ | My bookings |
+| GET | `/event/:eventId` | Organizer | All bookings for an event |
+| GET | `/admin/all` | Admin | All bookings |
+| GET | `/:id` | ✓ | Single booking |
+| PUT | `/:id/status` | Admin | Update status manually |
+| DELETE | `/:id` | ✓ | Cancel booking |
+
+### Payments — `/api/payments`
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/checkout/:bookingId` | ✓ | Create Stripe Checkout session |
+| POST | `/simulate/:bookingId` | ✓ | Simulate payment (no Stripe needed) |
+| POST | `/webhook` | — | Stripe webhook (raw body) |
+| GET | `/booking/:bookingId` | ✓ | Get payment record |
+| GET | `/admin/all` | Admin | All payments |
+
+### Tickets — `/api/tickets`
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/my` | ✓ | My tickets |
+| GET | `/booking/:bookingId` | ✓ | Tickets for a booking |
+| GET | `/event/:eventId` | Organizer | All tickets for event |
+| GET | `/:id/qr` | ✓ | QR code as base64 PNG |
+| GET | `/:id/qr/download` | ✓ | Download QR as PNG file |
+| DELETE | `/:id` | ✓ | Cancel ticket (restores seat) |
+
+### Attendance — `/api/attendance`
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/scan` | Organizer | Scan QR code — returns PRESENT / DUPLICATE / INVALID |
+| GET | `/event/:eventId` | Organizer | Confirmed attendees |
+| GET | `/event/:eventId/all-scans` | Organizer | All scan attempts including fraud |
+| GET | `/event/:eventId/summary` | Organizer | Live summary: seat fill rate, attendance rate |
+| GET | `/user/:userId` | ✓ | User's attendance history |
 
 ---
 
-## 5. Project Structure
+## Core Workflows
 
-| Path | Description |
-|------|-------------|
-| `src/index.js` | Express app entry point — registers all route modules and middleware |
-| `src/routes/auth.routes.js` | Register, login, and user management endpoints |
-| `src/routes/event.routes.js` | Event CRUD, search/filter, banner upload, publish |
-| `src/routes/booking.routes.js` | Seat reservation and booking lifecycle management |
-| `src/routes/payment.routes.js` | Stripe checkout, webhook handler, simulated payment |
-| `src/routes/ticket.routes.js` | QR ticket listing, base64 image, and PNG download |
-| `src/routes/attendance.routes.js` | QR scan, attendance tracking, dashboard summary |
-| `src/services/auth.service.js` | Register, login, and user CRUD business logic |
-| `src/services/event.service.js` | Event creation, validation, seat management, search |
-| `src/services/booking.service.js` | Booking lifecycle, atomic seat reservation/release |
-| `src/services/payment.service.js` | Stripe integration, webhook processing, simulated flow |
-| `src/services/ticket.service.js` | Per-ticket QR code generation (UUID-based), CRUD |
-| `src/services/attendance.service.js` | Scan pipeline, duplicate prevention, attendance summaries |
-| `src/services/email.service.js` | HTML email with embedded QR images via Nodemailer |
-| `src/middleware/auth.middleware.js` | JWT verification, requireOrganizer, requireAdmin guards |
-| `src/middleware/upload.middleware.js` | Multer config — JPEG/PNG/WEBP/GIF, 5 MB limit |
-| `src/lib/prisma.js` | Prisma client singleton with query logging in dev mode |
-| `prisma/schema.prisma` | Database schema — 6 models and 6 enums |
-| `prisma/migrations/` | Auto-generated SQL migration files |
-| `prisma/seed.js` | Seeds test accounts and one sample event |
-| `.env.example` | Environment variable template |
+### WF1 — Attendee Books a Ticket
+1. `POST /api/bookings` → reserves seats atomically, status: PENDING
+2. `POST /api/payments/checkout/:bookingId` → Stripe Checkout session (or simulate)
+3. Stripe webhook fires `checkout.session.completed`
+4. Booking → CONFIRMED · Payment → SUCCEEDED
+5. QR tickets auto-generated and emailed as PDF via **Azure ACS**
+
+### WF2 — Free Event Booking
+1. `POST /api/bookings` → creates booking
+2. `POST /api/payments/checkout/:bookingId` → detects `totalAmount = 0`, skips Stripe
+3. Booking confirmed immediately, tickets issued and emailed via **Azure ACS**
+
+### WF3 — QR Scan at Venue
+1. Organiser opens QRScanner page on any device
+2. `POST /api/attendance/scan` with `{ qrCode }`
+3. System checks: valid? already scanned? cancelled?
+4. Returns `{ status: PRESENT | DUPLICATE | INVALID, attendeeName, message }`
+5. Ticket marked USED on first successful scan (fraud prevention)
+
+### WF4 — Organiser Cancels Event ← NEW
+1. Organiser clicks **Cancel Event** on their dashboard
+2. `POST /api/events/:id/cancel` → event marked CANCELLED, all active tickets cancelled
+3. Backend collects all confirmed attendees' emails from the database
+4. **Azure Logic App** `event-cancel-notify` is triggered via HTTP POST
+5. Logic App loops over each attendee (up to 5 concurrent) with automatic retry
+6. Each iteration calls `/api/events/internal/notify-cancellation` (secret-protected)
+7. Backend sends a branded "Event Cancelled" email via **Azure ACS** to that attendee
+8. Response includes `notifiedAttendees` count confirming how many were queued
+
+### WF5 — Daily Attendance Report (Azure Function)
+1. Triggers daily at 06:00 UTC via timer
+2. Finds all events where `eventDate <= now`, status = PUBLISHED
+3. Generates PDF: tickets sold, attended, no-shows, attendance rate, revenue
+4. Emails PDF to organiser; marks event COMPLETED
 
 ---
 
-## 6. Database Schema Overview
+## Database Schema
 
-Six Prisma models map to PostgreSQL tables. All foreign keys are enforced at the database level.
+Six Prisma models mapped to PostgreSQL. All foreign keys enforced at the database level.
 
-| Model | Table | Purpose |
-|-------|-------|---------|
-| User | users | All user accounts. Role: ATTENDEE, ORGANIZER, or ADMIN. Soft-delete via isActive flag. |
-| Event | events | Events created by organisers. Tracks totalSeats and availableSeats separately for real-time inventory. |
-| Booking | bookings | Links a user to an event and a quantity. Seats are reserved on creation and released on cancellation or payment failure. |
-| Payment | payments | One payment record per booking. Supports Stripe session IDs and the simulated payment toggle. |
-| Ticket | tickets | One row per individual ticket. Contains a unique QR code string generated from ticket ID, event ID, user ID, and a UUID. |
-| Attendance | attendance | Scan log for every QR scan attempt. Status values: PRESENT, DUPLICATE, INVALID. ticketId is unique to enforce one valid entry per ticket. |
+| Model | Table | Description |
+|-------|-------|-------------|
+| User | users | All accounts. Role: ATTENDEE / ORGANIZER / ADMIN |
+| Event | events | Events. Tracks `totalSeats` and `availableSeats` separately |
+| Booking | bookings | Links user + event + quantity. Seats reserved/released atomically |
+| Payment | payments | One record per booking. Stripe or simulated |
+| Ticket | tickets | One row per physical ticket. Unique QR code string |
+| Attendance | attendance | Scan log. `ticketId` unique — enforces one valid scan per ticket |
 
 ### Enumerations
-
-| Enum | Allowed Values |
-|------|---------------|
+| Enum | Values |
+|------|--------|
 | Role | ATTENDEE · ORGANIZER · ADMIN |
 | EventStatus | DRAFT · PUBLISHED · CANCELLED · COMPLETED |
 | BookingStatus | PENDING · CONFIRMED · CANCELLED · REFUNDED |
@@ -172,1180 +385,43 @@ Six Prisma models map to PostgreSQL tables. All foreign keys are enforced at the
 
 ---
 
-## 7. Available npm Scripts
-
-| Script | Command | Description |
-|--------|---------|-------------|
-| start | `npm start` | Run server with Node.js |
-| dev | `npm run dev` | Run with nodemon — auto-restarts on file changes |
-| db:migrate | `npm run db:migrate` | Create and apply a new Prisma migration |
-| db:push | `npm run db:push` | Push schema directly to DB (no migration file) |
-| db:studio | `npm run db:studio` | Open Prisma Studio — browser-based DB GUI |
-| db:seed | `npm run db:seed` | Seed test user accounts and sample event |
+## User Roles
+| Role | Capabilities |
+|------|-------------|
+| ATTENDEE | Browse events, book tickets, pay, view own tickets and bookings |
+| ORGANIZER | All attendee capabilities + create / publish / cancel events, scan QR codes, view dashboards |
+| ADMIN | Full access — manage users, all bookings / payments, delete attendance records |
 
 ---
 
-## 9. API Endpoints
-
-All endpoints are prefixed with `http://20.174.16.183:3000`. Protected routes require the header:
-`Authorization: Bearer YOUR_JWT_TOKEN`
+## Monitoring
+`event-insights` (Azure Application Insights) collects all HTTP request traces, unhandled exceptions, and external dependency calls (PostgreSQL, Stripe, ACS, Key Vault, AI Search). View in Azure Portal → `event-insights` → **Live Metrics** for real-time, or **Transaction Search** to debug specific requests.
 
 ---
 
-### 9.1 Authentication — `/api/auth`
-
----
-
-#### POST `/api/auth/register`
-Register a new user account.
-
-**Auth required:** No
-
-**Request body:**
-```json
-{
-  "name": "Fatima Naeem",
-  "email": "fatima@test.com",
-  "password": "password123",
-  "role": "ATTENDEE"
-}
-```
-> `role` is optional. Accepted values: `ATTENDEE`, `ORGANIZER`, `ADMIN`. Defaults to `ATTENDEE`.
-
-**Example response (201):**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 1,
-    "name": "Fatima Naeem",
-    "email": "fatima@test.com",
-    "role": "ATTENDEE"
-  }
-}
-```
-
----
-
-#### POST `/api/auth/login`
-Login and receive a JWT token.
-
-**Auth required:** No
-
-**Request body:**
-```json
-{
-  "email": "fatima@test.com",
-  "password": "password123"
-}
-```
-
-**Example response (200):**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 1,
-    "name": "Fatima Naeem",
-    "email": "fatima@test.com",
-    "role": "ATTENDEE"
-  }
-}
-```
-
----
-
-#### GET `/api/auth/me`
-Get the currently logged-in user's profile.
-
-**Auth required:** Yes
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "name": "Fatima Naeem",
-  "email": "fatima@test.com",
-  "role": "ATTENDEE",
-  "createdAt": "2026-01-01T10:00:00.000Z"
-}
-```
-
----
-
-#### GET `/api/auth/users`
-List all users. Admin only.
-
-**Auth required:** Yes (ADMIN)
-
-**Query params (optional):** `?skip=0&take=50`
-
-**Example response (200):**
-```json
-[
-  { "id": 1, "name": "Fatima Naeem", "email": "fatima@test.com", "role": "ATTENDEE" },
-  { "id": 2, "name": "Haseeb Ahmed", "email": "haseeb@test.com", "role": "ORGANIZER" }
-]
-```
-
----
-
-#### GET `/api/auth/users/:id`
-Get a single user by ID.
-
-**Auth required:** Yes
-
-**Example response (200):**
-```json
-{
-  "id": 2,
-  "name": "Haseeb Ahmed",
-  "email": "haseeb@test.com",
-  "role": "ORGANIZER"
-}
-```
-
----
-
-#### PUT `/api/auth/users/:id`
-Update a user profile. Users can only update their own profile. Admins can update anyone.
-
-**Auth required:** Yes
-
-**Request body (all fields optional):**
-```json
-{
-  "name": "Haseeb Ahmed Updated",
-  "email": "newemail@test.com"
-}
-```
-
-**Example response (200):**
-```json
-{
-  "id": 2,
-  "name": "Haseeb Ahmed Updated",
-  "email": "newemail@test.com",
-  "role": "ORGANIZER"
-}
-```
-
----
-
-#### DELETE `/api/auth/users/:id`
-Deactivate a user account. Admin only.
-
-**Auth required:** Yes (ADMIN)
-
-**Example response (200):**
-```json
-{
-  "message": "User 2 deactivated"
-}
-```
-
----
-
-### 9.2 Events — `/api/events`
-
----
-
-#### GET `/api/events`
-Browse all published events. Supports search and filtering.
-
-**Auth required:** No
-
-**Query params (all optional):**
-
-| Param | Description | Example |
-|-------|-------------|---------|
-| `search` | Filter by title or description keyword | `?search=tech` |
-| `venue` | Filter by venue name | `?venue=karachi` |
-| `from` | Filter events on or after this date | `?from=2026-01-01` |
-| `to` | Filter events on or before this date | `?to=2026-12-31` |
-| `skip` | Pagination offset | `?skip=0` |
-| `take` | Number of results to return | `?take=20` |
-
-**Example response (200):**
-```json
-{
-  "events": [
-    {
-      "id": 1,
-      "title": "Tech Conference Karachi",
-      "venue": "Karachi Expo Center",
-      "eventDate": "2026-12-01T10:00:00.000Z",
-      "ticketPrice": 500,
-      "availableSeats": 98,
-      "totalSeats": 100,
-      "status": "PUBLISHED"
-    }
-  ],
-  "total": 1,
-  "skip": 0,
-  "take": 50
-}
-```
-
----
-
-#### GET `/api/events/:id`
-Get a single event with real-time seat availability.
-
-**Auth required:** No
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "title": "Tech Conference Karachi",
-  "venue": "Karachi Expo Center",
-  "eventDate": "2026-12-01T10:00:00.000Z",
-  "ticketPrice": 500,
-  "totalSeats": 100,
-  "availableSeats": 98,
-  "seatsSold": 2,
-  "seatsAvailable": 98,
-  "isSoldOut": false,
-  "status": "PUBLISHED"
-}
-```
-
----
-
-#### POST `/api/events`
-Create a new event. Organizer only.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Request body:**
-```json
-{
-  "title": "Tech Conference Karachi",
-  "description": "Annual tech meetup",
-  "venue": "Karachi Expo Center",
-  "eventDate": "2026-12-01T10:00:00.000Z",
-  "totalSeats": 100,
-  "ticketPrice": 500
-}
-```
-> `ticketPrice` set to `0` makes the event free. `description` is optional.
-
-**Example response (201):**
-```json
-{
-  "id": 1,
-  "title": "Tech Conference Karachi",
-  "status": "DRAFT",
-  "totalSeats": 100,
-  "availableSeats": 100,
-  "ticketPrice": 500,
-  "organizer": { "id": 2, "name": "Haseeb Ahmed" }
-}
-```
-
----
-
-#### PUT `/api/events/:id`
-Update an event. Only the organizer who created it can update it.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Request body (all fields optional):**
-```json
-{
-  "title": "Updated Title",
-  "venue": "New Venue",
-  "totalSeats": 150,
-  "ticketPrice": 750
-}
-```
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "title": "Updated Title",
-  "venue": "New Venue",
-  "totalSeats": 150,
-  "status": "DRAFT"
-}
-```
-
----
-
-#### POST `/api/events/:id/publish`
-Publish a DRAFT event so it appears in the public listing.
-
-**Auth required:** Yes (ORGANIZER)
-
-**No request body needed.**
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "title": "Tech Conference Karachi",
-  "status": "PUBLISHED"
-}
-```
-
----
-
-#### POST `/api/events/:id/banner`
-Upload a banner image for an event. Send as `multipart/form-data`.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Form field:** `banner` — image file (JPEG, PNG, WEBP, or GIF, max 5 MB)
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "title": "Tech Conference Karachi",
-  "bannerUrl": "http://20.174.16.183:3000/uploads/banners/1735000000000-123456789.jpg"
-}
-```
-
----
-
-#### GET `/api/events/:id/dashboard`
-Get attendance and revenue stats for an event. Only the event's organizer can access this.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-{
-  "event": { "id": 1, "title": "Tech Conference Karachi" },
-  "stats": {
-    "totalBookings": 3,
-    "confirmedBookings": 2,
-    "totalRevenue": 1000,
-    "ticketsSold": 2,
-    "seatsRemaining": 98,
-    "attendedCount": 1,
-    "notYetArrived": 1,
-    "fillRatePct": 2
-  }
-}
-```
-
----
-
-#### GET `/api/events/my`
-List all events created by the logged-in organizer.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-[
-  { "id": 1, "title": "Tech Conference Karachi", "status": "PUBLISHED" },
-  { "id": 2, "title": "Art Workshop", "status": "DRAFT" }
-]
-```
-
----
-
-#### DELETE `/api/events/:id`
-Cancel an event (sets status to CANCELLED).
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-{
-  "message": "Event 'Tech Conference Karachi' cancelled"
-}
-```
-
----
-
-### 9.3 Bookings — `/api/bookings`
-
----
-
-#### POST `/api/bookings`
-Create a booking and reserve seats. Seats are held immediately.
-
-**Auth required:** Yes (ATTENDEE)
-
-**Request body:**
-```json
-{
-  "eventId": 1,
-  "quantity": 2
-}
-```
-> `quantity` must be between 1 and 10.
-
-**Example response (201):**
-```json
-{
-  "id": 1,
-  "userId": 5,
-  "eventId": 1,
-  "quantity": 2,
-  "totalAmount": 1000,
-  "status": "PENDING",
-  "event": { "id": 1, "title": "Tech Conference Karachi" }
-}
-```
-
----
-
-#### GET `/api/bookings/my`
-List all bookings made by the logged-in user.
-
-**Auth required:** Yes
-
-**Example response (200):**
-```json
-[
-  {
-    "id": 1,
-    "quantity": 2,
-    "totalAmount": 1000,
-    "status": "CONFIRMED",
-    "event": { "title": "Tech Conference Karachi", "eventDate": "2026-12-01T10:00:00.000Z" },
-    "tickets": [ { "id": 1, "qrCode": "TKT-1-EVT-1-USR-5-BKG-1-..." } ]
-  }
-]
-```
-
----
-
-#### GET `/api/bookings/:id`
-Get a single booking by ID. Users can only view their own bookings.
-
-**Auth required:** Yes
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "quantity": 2,
-  "totalAmount": 1000,
-  "status": "CONFIRMED",
-  "payment": { "status": "SUCCEEDED", "paidAt": "2026-11-01T12:00:00.000Z" },
-  "tickets": [ { "id": 1 }, { "id": 2 } ]
-}
-```
-
----
-
-#### GET `/api/bookings/event/:eventId`
-List all bookings for a specific event. Organizer only.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-[
-  {
-    "id": 1,
-    "quantity": 2,
-    "status": "CONFIRMED",
-    "user": { "name": "Afaf Irfan", "email": "afaf@test.com" }
-  }
-]
-```
-
----
-
-#### DELETE `/api/bookings/:id`
-Cancel a booking. Users can only cancel their own bookings.
-
-**Auth required:** Yes
-
-**Example response (200):**
-```json
-{
-  "message": "Booking 1 cancelled"
-}
-```
-
----
-
-### 9.4 Payments — `/api/payments`
-
----
-
-#### POST `/api/payments/simulate/:bookingId`
-Simulate a payment confirmation or failure without Stripe. This is the primary payment method for demos and testing.
-
-**Auth required:** Yes
-
-**Request body:**
-```json
-{
-  "success": true
-}
-```
-> Set `"success": false` to simulate a failed payment — the booking is cancelled and seats are restored.
-
-**Example response when success is true (200):**
-```json
-{
-  "success": true,
-  "message": "Simulated payment success — booking confirmed, tickets generated, email sent",
-  "bookingId": 1,
-  "ticketsGenerated": 2,
-  "tickets": [
-    { "id": 1, "qrCode": "TKT-1-EVT-1-USR-5-BKG-1-8e56ce52-...", "seatNumber": "GEN-1" },
-    { "id": 2, "qrCode": "TKT-2-EVT-1-USR-5-BKG-1-0c184b13-...", "seatNumber": "GEN-2" }
-  ]
-}
-```
-
-**Example response when success is false (200):**
-```json
-{
-  "success": false,
-  "message": "Simulated payment failure — booking cancelled, seats restored",
-  "bookingId": 1
-}
-```
-
----
-
-#### POST `/api/payments/checkout/:bookingId`
-Create a real Stripe Checkout session. Requires `STRIPE_SECRET_KEY` in `.env`.
-
-**Auth required:** Yes
-
-**No request body needed.**
-
-**Example response (200):**
-```json
-{
-  "checkoutUrl": "https://checkout.stripe.com/pay/cs_test_...",
-  "stripeSessionId": "cs_test_...",
-  "bookingId": 1
-}
-```
-
----
-
-#### GET `/api/payments/booking/:bookingId`
-Get the payment record for a booking.
-
-**Auth required:** Yes
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "bookingId": 1,
-  "amount": 1000,
-  "currency": "usd",
-  "status": "SUCCEEDED",
-  "paidAt": "2026-11-01T12:00:00.000Z"
-}
-```
-
----
-
-### 9.5 Tickets — `/api/tickets`
-
----
-
-#### GET `/api/tickets/my`
-List all tickets belonging to the logged-in user.
-
-**Auth required:** Yes
-
-**Example response (200):**
-```json
-[
-  {
-    "id": 1,
-    "qrCode": "TKT-1-EVT-1-USR-5-BKG-1-8e56ce52-...",
-    "seatNumber": "GEN-1",
-    "status": "ACTIVE",
-    "issuedAt": "2026-11-01T12:00:00.000Z",
-    "event": { "title": "Tech Conference Karachi", "venue": "Karachi Expo Center" }
-  }
-]
-```
-
----
-
-#### GET `/api/tickets/:id`
-Get a single ticket by ID.
-
-**Auth required:** Yes (own ticket, or ORGANIZER/ADMIN)
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "qrCode": "TKT-1-EVT-1-USR-5-BKG-1-8e56ce52-...",
-  "seatNumber": "GEN-1",
-  "status": "ACTIVE",
-  "event": { "title": "Tech Conference Karachi" },
-  "user": { "name": "Afaf Irfan" }
-}
-```
-
----
-
-#### GET `/api/tickets/:id/qr`
-Get the ticket's QR code as a base64 PNG image string (for displaying in a frontend).
-
-**Auth required:** Yes (own ticket, or ORGANIZER/ADMIN)
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "qrCode": "TKT-1-EVT-1-USR-5-BKG-1-...",
-  "qrImageBase64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
-}
-```
-
----
-
-#### GET `/api/tickets/:id/qr/download`
-Download the QR code as a PNG file directly to your computer.
-
-**Auth required:** Yes (own ticket, or ORGANIZER/ADMIN)
-
-**No request body needed.**
-
-> In Postman: click the dropdown arrow next to Send → click **"Send and Download"** → save as `ticket-1-qr.png`. Open the file to see the QR code image.
-
-**Response:** Binary PNG file download (`ticket-N-qr.png`)
-
----
-
-#### GET `/api/tickets/booking/:bookingId`
-List all tickets for a specific booking.
-
-**Auth required:** Yes
-
-**Example response (200):**
-```json
-[
-  { "id": 1, "qrCode": "TKT-1-...", "seatNumber": "GEN-1", "status": "ACTIVE" },
-  { "id": 2, "qrCode": "TKT-2-...", "seatNumber": "GEN-2", "status": "ACTIVE" }
-]
-```
-
----
-
-#### GET `/api/tickets/event/:eventId`
-List all tickets issued for an event. Organizer only.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-[
-  {
-    "id": 1,
-    "seatNumber": "GEN-1",
-    "status": "USED",
-    "user": { "name": "Afaf Irfan", "email": "afaf@test.com" }
-  }
-]
-```
-
----
-
-#### DELETE `/api/tickets/:id`
-Cancel a ticket and restore one seat to the event.
-
-**Auth required:** Yes (own ticket, or ORGANIZER/ADMIN)
-
-**Example response (200):**
-```json
-{
-  "message": "Ticket 1 cancelled"
-}
-```
-
----
-
-### 9.6 Attendance — `/api/attendance`
-
----
-
-#### POST `/api/attendance/scan`
-Scan a QR code to mark an attendee as present. The full validation pipeline runs: ticket lookup → duplicate check → status check → mark USED → record attendance.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Request body:**
-```json
-{
-  "qrCode": "TKT-1-EVT-1-USR-5-BKG-1-8e56ce52-be08-4c57-89fe-defb1a60a167"
-}
-```
-
-**Example response — valid scan (200):**
-```json
-{
-  "success": true,
-  "status": "PRESENT",
-  "message": "Entry allowed — attendance marked successfully",
-  "ticketId": 1,
-  "eventId": 1,
-  "attendeeName": "Afaf Irfan",
-  "seatNumber": "GEN-1",
-  "scanTime": "2026-12-01T10:15:00.000Z"
-}
-```
-
-**Example response — duplicate scan (200):**
-```json
-{
-  "success": false,
-  "status": "DUPLICATE",
-  "message": "Duplicate entry blocked — this ticket has already been scanned",
-  "ticketId": 1
-}
-```
-
-**Example response — invalid QR (200):**
-```json
-{
-  "success": false,
-  "status": "INVALID",
-  "message": "Invalid QR code — not found in system"
-}
-```
-
----
-
-#### GET `/api/attendance/event/:eventId`
-List all confirmed attendees (PRESENT scans only) for an event.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-[
-  {
-    "id": 1,
-    "status": "PRESENT",
-    "scanTime": "2026-12-01T10:15:00.000Z",
-    "ticket": {
-      "seatNumber": "GEN-1",
-      "user": { "name": "Afaf Irfan", "email": "afaf@test.com" }
-    }
-  }
-]
-```
-
----
-
-#### GET `/api/attendance/event/:eventId/summary`
-Get real-time attendance stats for an event.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-{
-  "eventId": 1,
-  "eventTitle": "Tech Conference Karachi",
-  "totalSeats": 100,
-  "availableSeats": 98,
-  "attended": 1,
-  "totalScanAttempts": 3,
-  "duplicateAttemptsBlocked": 2,
-  "invalidAttempts": 0
-}
-```
-
----
-
-#### GET `/api/attendance/event/:eventId/all-scans`
-List every scan attempt for an event including duplicates and invalid scans. Useful for fraud auditing.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-[
-  { "id": 1, "status": "PRESENT", "scanTime": "2026-12-01T10:15:00.000Z" },
-  { "id": 2, "status": "DUPLICATE", "scanTime": "2026-12-01T10:16:00.000Z" },
-  { "id": 3, "status": "INVALID", "scanTime": "2026-12-01T10:17:00.000Z" }
-]
-```
-
----
-
-#### GET `/api/attendance/user/:userId`
-Get all events a user has attended (their personal attendance history).
-
-**Auth required:** Yes (own history, or ORGANIZER/ADMIN)
-
-**Example response (200):**
-```json
-{
-  "userId": 5,
-  "totalEventsAttended": 2,
-  "history": [
-    {
-      "attendanceId": 1,
-      "scanTime": "2026-12-01T10:15:00.000Z",
-      "event": {
-        "id": 1,
-        "title": "Tech Conference Karachi",
-        "venue": "Karachi Expo Center",
-        "eventDate": "2026-12-01T10:00:00.000Z"
-      },
-      "ticket": { "id": 1, "seatNumber": "GEN-1" }
-    }
-  ]
-}
-```
-
----
-
-#### GET `/api/attendance/:id`
-Get a single attendance record by ID.
-
-**Auth required:** Yes (ORGANIZER)
-
-**Example response (200):**
-```json
-{
-  "id": 1,
-  "status": "PRESENT",
-  "scanTime": "2026-12-01T10:15:00.000Z",
-  "notes": "Entry granted",
-  "ticket": { "id": 1, "qrCode": "TKT-1-..." }
-}
-```
-
----
-
-#### DELETE `/api/attendance/:id`
-Delete an attendance record and reset the linked ticket back to ACTIVE. Admin only.
-
-**Auth required:** Yes (ADMIN)
-
-**Example response (200):**
-```json
-{
-  "message": "Attendance record 1 deleted"
-}
-```
-
----
-
-### 9.7 Quick Reference — All Routes
-
-| Method | Route | Auth | Description |
-|--------|-------|------|-------------|
-| POST | `/api/auth/register` | No | Register new user |
-| POST | `/api/auth/login` | No | Login and get token |
-| GET | `/api/auth/me` | Yes | Get current user |
-| GET | `/api/auth/users` | Admin | List all users |
-| GET | `/api/auth/users/:id` | Yes | Get user by ID |
-| PUT | `/api/auth/users/:id` | Yes | Update user |
-| DELETE | `/api/auth/users/:id` | Admin | Deactivate user |
-| GET | `/api/events` | No | Browse/search events |
-| GET | `/api/events/:id` | No | Get event with seat status |
-| POST | `/api/events` | Organizer | Create event |
-| PUT | `/api/events/:id` | Organizer | Update event |
-| POST | `/api/events/:id/publish` | Organizer | Publish event |
-| POST | `/api/events/:id/banner` | Organizer | Upload banner image |
-| GET | `/api/events/:id/dashboard` | Organizer | Get event stats |
-| GET | `/api/events/my` | Organizer | My events |
-| DELETE | `/api/events/:id` | Organizer | Cancel event |
-| POST | `/api/bookings` | Yes | Create booking |
-| GET | `/api/bookings/my` | Yes | My bookings |
-| GET | `/api/bookings/:id` | Yes | Get booking |
-| GET | `/api/bookings/event/:eventId` | Organizer | Bookings for event |
-| DELETE | `/api/bookings/:id` | Yes | Cancel booking |
-| POST | `/api/payments/simulate/:bookingId` | Yes | Simulate payment (no Stripe) |
-| POST | `/api/payments/checkout/:bookingId` | Yes | Create Stripe checkout |
-| GET | `/api/payments/booking/:bookingId` | Yes | Get payment record |
-| GET | `/api/tickets/my` | Yes | My tickets |
-| GET | `/api/tickets/:id` | Yes | Get ticket |
-| GET | `/api/tickets/:id/qr` | Yes | Get QR as base64 image |
-| GET | `/api/tickets/:id/qr/download` | Yes | Download QR as PNG file |
-| GET | `/api/tickets/booking/:bookingId` | Yes | Tickets for booking |
-| GET | `/api/tickets/event/:eventId` | Organizer | Tickets for event |
-| DELETE | `/api/tickets/:id` | Yes | Cancel ticket |
-| POST | `/api/attendance/scan` | Organizer | Scan QR code |
-| GET | `/api/attendance/event/:eventId` | Organizer | Confirmed attendees |
-| GET | `/api/attendance/event/:eventId/summary` | Organizer | Attendance stats |
-| GET | `/api/attendance/event/:eventId/all-scans` | Organizer | All scan attempts |
-| GET | `/api/attendance/user/:userId` | Yes | User attendance history |
-| GET | `/api/attendance/:id` | Organizer | Get attendance record |
-| DELETE | `/api/attendance/:id` | Admin | Delete attendance record |
-
-
-## 1. Project Overview
-
-EventHub is a full-stack web application for managing events, bookings, payments, and QR-based attendance tracking. It supports three user roles — Attendee, Organizer, and Admin — each with their own protected workflows.
-
-The React frontend connects to an Express/PostgreSQL backend via a JWT-authenticated REST API. All core workflows are fully implemented end-to-end: browsing and booking events, simulated payment and ticket generation, organizer event management, and real-time QR scan attendance.
-
----
-
-## 2. Implemented Features
-
-### Attendee Workflows
-- Browse and search published events with keyword, venue, and date filters
-- View event details with real-time seat availability
-- Book tickets (1–10 seats) with instant seat reservation
-- Simulate payment confirmation or failure
-- Receive QR-code tickets after confirmed payment
-- View and manage personal bookings and tickets
-- Cancel bookings with automatic seat restoration
-
-### Organizer Workflows
-- Create and manage events with full CRUD
-- Upload banner images for events
-- Publish draft events to the public catalogue
-- View per-event dashboard: bookings, revenue, attendance stats
-- Scan attendee QR codes to mark attendance
-- Duplicate scan prevention and fraud detection
-
-### Authentication & Infrastructure
-- JWT-based login and registration with role selection
-- Persistent sessions via localStorage token
-- Role-aware navigation (Navbar adapts per role)
-- Protected routes (redirect to login if unauthenticated, Access Denied if wrong role)
-- Automatic token expiry handling with redirect
-
----
-
-## 3. Frameworks and Libraries
-
-### Frontend
-| Library | Version | Purpose |
-|---------|---------|---------|
-| React | 19 | UI component framework |
-| React Router DOM | 7 | Client-side routing |
-| Axios | 1.15 | HTTP client with JWT interceptors |
-
-
-## 4. Setup and Installation
-
-### Prerequisites
-- Node.js v18 or higher — https://nodejs.org
-- PostgreSQL 14 or higher running locally
-- npm (bundled with Node.js)
-
----
-
-### Step 1 — Clone the Repository
-bash
-git clone https://github.com/haseebahmed003/azure-event-management-system.git
-cd azure-event-management-system
-
-
----
-
-### Step 2 — Install Backend Dependencies
-bash
-npm install
-
-
----
-
-### Step 3 — Configure Environment Variables
-bash
-cp .env.example .env
-
-
-Open .env and fill in your values:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| DATABASE_URL | PostgreSQL connection string | postgresql://postgres:password@localhost:5432/event_system_db |
-| JWT_SECRET | Secret key for JWT tokens | any-long-random-string |
-| JWT_EXPIRES_IN | Token lifetime | 7d |
-| PORT | Backend server port | 3000 |
-| APP_BASE_URL | Base URL for links | http://20.174.16.183:3000 |
-| SMTP_HOST | SMTP host (optional) | smtp.gmail.com |
-| SMTP_PORT | SMTP port (optional) | 587 |
-| SMTP_USER | SMTP email (optional) | your@gmail.com |
-| SMTP_PASS | SMTP password (optional) | your_app_password |
-| EMAIL_FROM | Sender address (optional) | your@gmail.com |
-| STRIPE_SECRET_KEY | Stripe key (optional) | sk_test_... |
-| UPLOAD_DIR | Folder for banner images | uploads |
-
-> SMTP and Stripe are optional. The app works fully without them using the simulated payment endpoint.
-
----
-
-### Step 4 — Set Up the Database
-bash
-# Create the PostgreSQL database
-createdb event_system_db
-
-# Apply migrations
-npx prisma migrate dev --name init
-
-
----
-
-### Step 5 — Seed Test Data
-bash
-npm run db:seed
-
-
-This creates three test accounts:
-
-| Role | Email | Password |
-|------|-------|----------|
-| ADMIN | admin@eventsystem.com | admin123 |
-| ORGANIZER | organizer@eventsystem.com | organizer123 |
-| ATTENDEE | attendee@eventsystem.com | attendee123 |
-
----
-
-### Step 6 — Start the Backend
-bash
-npm start
-
-Backend runs at *http://20.174.16.183:3000*
-
----
-
-### Step 7 — Install Frontend Dependencies
-bash
-cd event-frontend
-npm install
-
-
----
-
-### Step 8 — Start the Frontend
-bash
-npm start
-
-
-When prompted about port 3000 being in use, press *Y* to use port 3001.
-
-Frontend runs at *http://localhost:3001*
-
----
-
-### Step 9 — Open the App
-
-Go to *http://localhost:3001* in your browser.
-
-Use the demo credentials above to log in, or register a new account.
-
----
-
-## 5. Project Structure
-azure-event-management-system/
-├── event-frontend/              
-│   ├── public/
-│   │   └── index.html
-│   ├── src/
-│   │   ├── api.js               # Axios client + all API calls
-│   │   ├── AuthContext.js       # Global JWT auth state
-│   │   ├── App.js               # All 12 routes
-│   │   ├── index.js             # React entry point
-│   │   ├── index.css            # Global dark design system
-│   │   ├── components/
-│   │   │   ├── Navbar.js        # Role-aware navigation
-│   │   │   ├── ProtectedRoute.js# Auth + role route guard
-│   │   │   └── NotFound.js      # 404 page
-│   │   └── pages/
-│   │       ├── Home.js          # Landing page
-│   │       ├── Login.js         # Login form
-│   │       ├── Register.js      # Register form
-│   │       ├── Events.js        # Browse events
-│   │       ├── EventDetail.js   # Event detail + booking
-│   │       ├── MyBookings.js    # Attendee bookings
-│   │       ├── MyTickets.js     # Attendee tickets
-│   │       ├── OrganizerEvents.js     # Organizer dashboard
-│   │       ├── EventForm.js           # Create/edit event
-│   │       ├── OrganizerDashboard.js  # Event analytics
-│   │       └── QRScanner.js           # Attendance scanner
-│   └── package.json
-├── src/                         # Express backend
-│   ├── index.js                 # App entry point
-│   ├── routes/                  # All API route files
-│   ├── services/                # Business logic
-│   ├── middleware/              # Auth + upload middleware
-│   └── lib/                    # Prisma client
-├── prisma/
-│   ├── schema.prisma            # Database schema
-│   ├── migrations/              # SQL migrations
-│   └── seed.js                  # Test data seeder
-├── .env.example
-└── package.json
-
----
-
-
-- src/api.js — Axios HTTP client with JWT request interceptor and 401 auto-logout response interceptor. Exports all API call functions for every backend endpoint.
-- src/AuthContext.js — React Context providing global auth state. Handles login, logout, and session re-hydration on page refresh using GET /api/auth/me.
-- src/index.css — Complete dark-theme CSS design system with custom properties, typography (DM Sans + Fraunces), buttons, cards, forms, badges, alerts, modals, tables, and responsive grid.
-- src/components/Navbar.js — Sticky navigation bar that adapts links based on user role (Guest / Attendee / Organizer).
-- src/components/ProtectedRoute.js — Route guard that redirects unauthenticated users to /login and shows Access Denied for wrong roles.
-- src/components/NotFound.js — 404 fallback page.
-- src/pages/Login.js — Login form with validation, JWT storage, and role-based redirect.
-- src/pages/Register.js — Registration form with role selection and auto-login on success.
-- src/pages/Home.js — Public landing page with hero section, feature overview, and live upcoming events grid.
-- src/App.js — Root component wiring all 12 routes with React Router v7 and AuthProvider.
-- Database schema design (Prisma models), backend auth routes and service, JWT middleware.
-
----
-
-
-- src/pages/Events.js — Public event browser with search, venue and date filters, and paginated results grid.
-- src/pages/EventDetail.js — Event detail page with seat availability, booking form, and payment simulation.
-- src/pages/OrganizerEvents.js — Organizer's event list with create, publish, edit, and cancel actions.
-- src/pages/EventForm.js — Create and edit event form with validation and banner upload.
-- src/pages/OrganizerDashboard.js — Per-event analytics dashboard showing bookings, revenue, and attendance stats.
-- Backend event routes and service (CRUD, publish, banner upload, dashboard).
-- Backend booking routes and service (seat reservation, cancellation).
-- Backend payment routes and service (Stripe integration, simulated payment endpoint).
-
----
-
-
-- src/pages/MyBookings.js — Attendee bookings list with payment simulation and cancellation.
-- src/pages/MyTickets.js — Attendee tickets with QR code display and ticket cancellation.
-- src/pages/QRScanner.js — Organizer QR scanner with real-time scan result feedback (valid / duplicate / invalid).
-- Backend ticket routes and service (QR generation, base64 image, PNG download).
-- Backend attendance routes and service (scan pipeline, duplicate prevention, attendance summary).
-- Email confirmation service (Nodemailer with embedded QR image).
-
----
-
-## 7. Version Control Practices
-
-| Practice | Detail |
-|----------|--------|
-| Branching | One branch per member. No direct pushes to main. |
-| Pull Requests | All features merged to main via pull requests. |
-| Commit Messages | Prefixed: feat: · fix: · style: · refactor: · docs: · chore: |
-| Collaboration | Work divided clearly by member. Each member owns their files. |
-
----
-
-## 8. Available Scripts
+## npm Scripts
 
 ### Backend (repo root)
 | Script | Command | Description |
 |--------|---------|-------------|
-| Start | npm start | Run backend server |
-| Dev | npm run dev | Run with nodemon auto-restart |
-| Migrate | npm run db:migrate | Create and apply Prisma migration |
-| Seed | npm run db:seed | Seed test accounts and sample event |
-| Studio | npm run db:studio | Open Prisma database GUI |
+| start | `npm start` | Run backend with Node |
+| dev | `npm run dev` | Run with nodemon auto-restart |
+| db:migrate | `npm run db:migrate` | Create + apply Prisma migration |
+| db:push | `npm run db:push` | Push schema (no migration file) |
+| db:studio | `npm run db:studio` | Open Prisma Studio GUI |
+| db:seed | `npm run db:seed` | Seed test accounts and sample event |
 
-### Frontend (event-frontend/)
+### Frontend (`event-frontend/`)
 | Script | Command | Description |
 |--------|---------|-------------|
-| Start | npm start | Start React development server |
-| Build | npm run build | Build for production |
-| Test | npm test | Run test suite |
+| start | `npm start` | React dev server |
+| build | `npm run build` | Production build |
 
+---
+
+## Known Limitations / Notes
+- Banner images are stored locally on the VM under `uploads/banners/`. For production, connect `ibab2cf` (Azure Blob Storage) for persistent cloud storage.
+- The `eventReport` Azure Function uses `nodemailer` (SMTP). For consistency, migrate it to ACS.
+- CORS is locked to `20.174.16.183:3001`. Update `src/index.js` if a domain or HTTPS is added.
+- The Logic App trigger URL contains a SAS signature — if the Logic App is deleted and recreated, `LOGIC_APP_CANCEL_URL` in `.env` must be updated and the backend restarted.
+- AI Search falls back to Prisma full-text search automatically if `SEARCH_ENDPOINT` is not set.
